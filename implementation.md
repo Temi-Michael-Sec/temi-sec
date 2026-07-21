@@ -2,7 +2,9 @@
 
 PR-sized build units with owners and merge gates.
 
-> **Phase 0 complete.** Phase 1 (content engine) is next.
+> **Phase 0 complete. Phase 1 in progress** — taxonomy, models and the
+> markdown pipeline are done. `toc.ts`, `reading-time.ts` and the seed script
+> remain (🧑).
 
 Related: [`README.md`](README.md) · [`structure.md`](structure.md) · [`PLAN.md`](PLAN.md)
 
@@ -48,7 +50,7 @@ to the PRs that implemented each control.
 | Phase | Scope | Status |
 |---|---|---|
 | 0 | Foundation, CI, static headers | ✅ Done |
-| 1 | Content engine | ☐ |
+| 1 | Content engine | 🔨 In progress |
 | 2 | Public reading experience → **DEPLOY** | ☐ |
 | 3 | Admin + editor + CTF guards | ☐ |
 | 4 | Engagement — likes, OAuth, comments | ☐ |
@@ -129,19 +131,30 @@ crashing with `MONGODB_URI` blank · theme toggle verified in both modes.
 
 Most load-bearing phase. Everything downstream renders through it.
 
-| Unit | Branch | Owner |
-|---|---|---|
-| `lib/taxonomy.ts` — **vocabulary** (which categories exist) | `p1/taxonomy-vocab` | 🧑 |
-| `lib/taxonomy.ts` — types + derivation machinery | `p1/taxonomy-types` | 🤖 |
-| `models/Post.ts` + six discriminators + indexes | `p1/models` | 🤖 |
-| `lib/markdown/render.ts` — pipeline | `p1/render` | 🤖 |
-| `lib/markdown/sanitize-schema.ts` | `p1/sanitize` | 🤖 |
-| `lib/markdown/directives.ts` | `p1/directives` | 🤖 |
-| `lib/markdown/toc.ts` | `p1/toc` | 🧑 |
-| `lib/reading-time.ts` | `p1/reading-time` | 🧑 |
-| **Search spike** — validate `searchTokens` design | `p1/search-spike` | 🤖 |
-| XSS payload suite through `render()` | `p1/xss-suite` | 🧑 *(optional)* |
-| Seed script — every directive, every type | `p1/seed` | 🧑 |
+| Unit | Branch | Owner | Status |
+|---|---|---|---|
+| `lib/taxonomy.ts` — vocabulary + derived types | `p1/taxonomy` | 🤖 | ✅ |
+| `models/Post.ts` + six discriminators + indexes | `p1/models` | 🤖 | ✅ |
+| `lib/markdown/sanitize-schema.ts` | `p1/sanitize` | 🤖 | ✅ |
+| `lib/markdown/directives.ts` | `p1/directives` | 🤖 | ✅ |
+| `lib/markdown/render.ts` — pipeline | `p1/render` | 🤖 | ✅ |
+| `lib/comments/render.ts` — plain text | `p1/comment-render` | 🤖 | ✅ |
+| Attack suites through `render()` | `p1/xss-suite` | 🤖 | ✅ |
+| `lib/markdown/toc.ts` | `p1/toc` | 🧑 | ☐ |
+| `lib/reading-time.ts` | `p1/reading-time` | 🧑 | ☐ |
+| **Search spike** — validate `searchTokens` | `p1/search-spike` | 🤖 | ☐ |
+| Seed script — every directive, every type | `p1/seed` | 🧑 | ☐ |
+
+**Taxonomy vocabulary is yours to edit.** The machinery is built and the
+starter categories are placeholders — the *content* of `FRAMEWORKS`,
+`CTF_CATEGORIES`, `TOOL_CATEGORIES` etc. is a decision about what you actually
+write about. Adding an entry is one line; a test enforces that every `blurb` is
+long enough to work as a facet page's meta description.
+
+**The comment renderer moved into Phase 1** from Phase 4. It has no dependency
+on comments existing, and building it alongside the post sanitizer made the
+contrast concrete: post bodies get a parser plus an allowlist, comments get
+neither.
 
 > ⚠️ **Taxonomy must use `as const` with derived union types**
 > (`typeof FRAMEWORKS[number]['slug']`). Typed as `string[]`, the "adding a
