@@ -1,6 +1,6 @@
 # Implementation
 
-Phased build steps and live progress. Tick items as they land.
+PR-sized build units with owners and merge gates.
 
 > **Current phase: not started.** Phase 0 is next.
 
@@ -8,262 +8,404 @@ Related: [`README.md`](README.md) · [`structure.md`](structure.md) · [`PLAN.md
 
 ---
 
+## How this is built
+
+**Trunk-based. One PR per unit below. No long-lived phase branches** — those
+recreate the big-bang merge this structure exists to avoid.
+
+- Branch naming: `p3/session-jose`, `p4/comment-filters` — phase prefix for
+  narrative, topic slug for meaning.
+- **Feature flags, not branches**, for anything landing before it's publicly
+  ready. Comments can merge behind `COMMENTS_ENABLED=false` while the filters
+  and moderation queue land as separate PRs.
+- Vercel preview deploys are the review environment — one per PR, free.
+- A unit is the right size when **reverting it breaks nothing else**.
+
+### Owners
+
+**You** take simple logic and the non-technical decisions. **Claude** takes the
+complex and security-critical parts. Marked per unit as 🧑 / 🤖.
+
+*Optional, not assigned:* writing attack suites against Claude's security code
+— XSS through `render()`, JWT forgery, OAuth `state` replay, rate-limit bypass.
+That's your actual field and where the real learning is, if you want it.
+
+### Standard merge gate — every PR
+
+1. CI green: `tsc --noEmit`, lint, `vitest run`
+2. Preview deploy builds; the affected route renders
+3. No new `dangerouslySetInnerHTML` outside the allowlisted files (CI grep)
+4. No secret in a `NEXT_PUBLIC_*` variable
+
+**PR descriptions carry the reasoning, not just the change.** The history is
+itself a portfolio deliverable — recruiters read it, and `/security` links back
+to the PRs that implemented each control.
+
+---
+
 ## Progress
 
 | Phase | Scope | Status |
 |---|---|---|
-| 0 | Foundation | ☐ Not started |
+| 0 | Foundation, CI, static headers | ☐ Not started |
 | 1 | Content engine | ☐ |
 | 2 | Public reading experience → **DEPLOY** | ☐ |
-| 3 | Admin + editor | ☐ |
+| 3 | Admin + editor + CTF guards | ☐ |
 | 4 | Engagement — likes, OAuth, comments | ☐ |
-| 5 | Specialized types + publish guards | ☐ |
+| 5 | Specialized types + facets + search | ☐ |
 | 6 | Series + freshness | ☐ |
-| 7 | Newsletter + RSS | ☐ |
-| 8 | Hardening + `/security` | ☐ |
+| 7 | Newsletter | ☐ |
+| 8 | CSP enforcement + pentest + `/security` | ☐ |
 
-**The site goes live at the end of Phase 2**, before the admin panel exists.
-Deliberate: a real URL early surfaces layout and performance problems on real
-devices, instead of discovering them after eight phases of local work. Two or
-three posts get seeded by hand to prove rendering.
+### Dependency graph
+
+```
+P0 ──► P1 ──┬──► P2 (public)   ─┐
+            └──► P3 (admin)    ─┴──► P4 ∥ P5 ∥ P6 ∥ P7 ──► P8
+```
+
+**P2 and P3 are independent** — disjoint route trees, converging only where
+publish writes `bodyHtml` and the post page reads it. After P3, four tracks
+parallelize. Only P4.F (admin comment queue) reaches back into P3.
 
 ---
 
 ## Phase 0 — Foundation
 
-- [ ] `npx create-next-app@latest` — TypeScript, Tailwind 4, App Router, `src/`
-- [ ] `.env.example` with every variable from the README
-- [ ] `lib/db.ts` — cached Mongoose connection (must not reconnect per request
-      in dev; Next hot-reload will exhaust the pool otherwise)
-- [ ] MongoDB Atlas M0 cluster + IP allowlist
-- [ ] Base layout: header, footer, nav
-- [ ] Dark mode via `next-themes`
-- [ ] Typography scale — long-form reading is the primary use, so set line
-      length and rhythm now rather than retrofitting
-- [ ] `.gitignore` verified for `.env*`
+| Unit | Branch | Owner |
+|---|---|---|
+| Scaffold: `create-next-app`, TS, Tailwind 4, App Router, `src/` | `p0/scaffold` | 🧑 |
+| `lib/db.ts` — cached Mongoose connection | `p0/db` | 🤖 |
+| Vitest + GitHub Actions CI + PR template | `p0/ci` | 🤖 |
+| Static security headers + `security.txt` | `p0/headers` | 🧑 |
+| Base layout, dark mode, typography scale | `p0/layout` | 🧑 |
 
-**Done when:** `npm run dev` serves a styled empty shell and the DB connects.
+- `.env.example` with every variable; `MONGODB_URI` left blank
+- Typography: set line length and rhythm now. Long-form reading is the primary
+  use, and retrofitting it later means re-checking every post layout.
+- Headers moved here from Phase 8 — zero dependencies, so there's no reason to
+  run eight phases without `nosniff`.
+
+> ⚠️ **The cached connection is not optional.** Next's hot reload re-executes
+> modules on every save; a fresh `mongoose.connect` per reload exhausts the
+> Atlas connection pool within minutes of normal dev.
+
+**Gate:** `npm run dev` serves a styled shell · `tsc --noEmit` clean ·
+`vitest run` executes · CI green on a PR · `curl -I` shows the static headers ·
+`/.well-known/security.txt` resolves · DB connection *defers* rather than
+crashing with `MONGODB_URI` blank.
 
 ---
 
 ## Phase 1 — Content engine
 
-The hardest and most load-bearing phase. Everything downstream depends on it.
+Most load-bearing phase. Everything downstream renders through it.
 
-- [ ] `models/Post.ts` — base schema + all six discriminators (§2, `structure.md`)
-- [ ] Indexes: `slug` unique, `{type, status, publishedAt}`, text index
-- [ ] `lib/taxonomy.ts` — controlled vocabularies
-- [ ] `lib/markdown/render.ts` — full unified pipeline
-- [ ] `lib/markdown/sanitize-schema.ts` — **post schema + stricter comment schema**
-- [ ] `lib/markdown/directives.ts` — `callout`, `spoiler`, `flag`, `youtube`
-- [ ] `lib/markdown/toc.ts` — heading extraction
-- [ ] `lib/reading-time.ts`
-- [ ] Seed script — 2–3 posts covering every directive and content type
+| Unit | Branch | Owner |
+|---|---|---|
+| `lib/taxonomy.ts` — **vocabulary** (which categories exist) | `p1/taxonomy-vocab` | 🧑 |
+| `lib/taxonomy.ts` — types + derivation machinery | `p1/taxonomy-types` | 🤖 |
+| `models/Post.ts` + six discriminators + indexes | `p1/models` | 🤖 |
+| `lib/markdown/render.ts` — pipeline | `p1/render` | 🤖 |
+| `lib/markdown/sanitize-schema.ts` | `p1/sanitize` | 🤖 |
+| `lib/markdown/directives.ts` | `p1/directives` | 🤖 |
+| `lib/markdown/toc.ts` | `p1/toc` | 🧑 |
+| `lib/reading-time.ts` | `p1/reading-time` | 🧑 |
+| **Search spike** — validate `searchTokens` design | `p1/search-spike` | 🤖 |
+| XSS payload suite through `render()` | `p1/xss-suite` | 🧑 *(optional)* |
+| Seed script — every directive, every type | `p1/seed` | 🧑 |
 
-### ⚠️ Do not skip
+> ⚠️ **Taxonomy must use `as const` with derived union types**
+> (`typeof FRAMEWORKS[number]['slug']`). Typed as `string[]`, the "adding a
+> category is one line" promise dies silently — nothing catches a typo'd slug.
 
-**Test the sanitizer with actual XSS payloads before moving on.** At minimum:
-`<script>`, `<img onerror=>`, `<iframe>`, `javascript:` URLs, and a raw
-`<svg onload=>`. Markdown permits raw HTML — an unsanitized renderer is a live
-XSS sink, and every later phase builds on this function. Catching it here is
-trivial; catching it in Phase 8 means auditing everything built on top.
+> ⚠️ **One text index per collection.** Discriminators share a collection, so
+> the text index is declared once on the *base* schema. Declaring it on a
+> discriminator too fails at index build — in production, on deploy.
 
-**Done when:** a seeded Markdown post renders with highlighting, a working TOC,
-callouts and spoilers — and every payload above is neutralised.
+> ⚠️ **TOC extracts from the hast tree after `rehype-slug`**, never by regex
+> over Markdown source. A source regex picks up `# comment` inside bash fences
+> and produces IDs that drift from the real anchors on duplicate or non-ASCII
+> headings.
+
+> ⚠️ **The search spike comes before the model freezes.** `-oN` cannot work via
+> `$text` — a leading `-` means negation and the tokenizer strips punctuation.
+> Validate the `searchTokens` two-path design (`structure.md` §2.14) while the
+> schema can still change.
+
+**Gate:** `p1/sanitize` merges only when the payload suite runs **through
+`render()`**, not against the schema in isolation — the real bugs live at
+pipeline seams, and schema-only tests would have passed while both known
+defects shipped. Suite must include **false-positive cases**: a fence containing
+literal `<script>alert(1)</script>` must *display* as code. Shiki output must
+survive sanitization.
 
 ---
 
-## Phase 2 — Public reading experience → **DEPLOY**
+## Phase 2 — Public reading → **DEPLOY**
 
-- [ ] Home — latest, featured, series entry points
-- [ ] Post page — `PostBody`, TOC sidebar, references, reading time
-- [ ] `CodeBlock` — copy button, terminal variant for shell output
-- [ ] `Callout`, `Spoiler` components
-- [ ] Listing pages: `/blog`, `/notes`
-- [ ] `/tags/[tag]`
-- [ ] Responsive layout — verify on a real phone, not just devtools
-- [ ] SEO metadata, OG images, `sitemap.ts`, `robots.ts`
-- [ ] **Deploy to Vercel** on a `*.vercel.app` subdomain
-- [ ] Lighthouse pass — target 95+ on performance and accessibility
+| Unit | Branch | Owner |
+|---|---|---|
+| `CodeBlock` copy button + terminal variant | `p2/codeblock` | 🧑 |
+| `Callout`, `Spoiler`, `FlagRedacted` | `p2/content-blocks` | 🧑 |
+| YouTube embed client component | `p2/youtube` | 🤖 |
+| Post page + TOC sidebar + references | `p2/post-page` | 🤖 |
+| Listings: `/blog`, `/notes`, `/tags/[tag]` | `p2/listings` | 🤖 |
+| Home | `p2/home` | 🧑 |
+| SEO, OG images, sitemap, robots | `p2/seo` | 🤖 |
+| **RSS feed** | `p2/rss` | 🤖 |
+| CSP **report-only** | `p2/csp-report` | 🤖 |
+| Deploy to Vercel | — | 🧑 |
 
-**Done when:** the site is publicly reachable and reads well on a phone.
+- **RSS moved here from Phase 7.** It has no email dependency at all, and on
+  free hosting it's the *only* working subscription channel — so it ships with
+  the first public deploy, not after.
+- **CSP starts report-only** and collects real violation data for weeks before
+  Phase 8 enforces it.
+
+> ⚠️ **Decide the CSP strategy now, not in Phase 8.** Nonces require
+> `headers()`, which forces every page reading one into dynamic rendering —
+> directly fighting the Lighthouse target on statically-generated post pages.
+> Prefer `'strict-dynamic'` + hashes over per-request nonces.
+
+> ⚠️ **`views` increments on an unauthenticated route with no rate limiting
+> until Phase 3.** Either defer the counter or accept that early numbers are
+> fiction.
+
+**Gate — the one worth being rigid about:** nothing goes public until
+`p1/xss-suite` is green. Also: Lighthouse 95+ on performance and accessibility,
+and the post page verified on a real phone, not just devtools.
 
 ---
 
 ## Phase 3 — Admin + editor
 
-- [ ] `models/User.ts`, seed the single admin (bcrypt cost 12)
-- [ ] `lib/auth/session.ts` — jose sign/verify. **Fail closed if `JWT_SECRET`
-      is unset — no insecure fallback**
-- [ ] `/admin/login` — generic failure message, no user enumeration
-- [ ] `middleware.ts` — gate all `/admin/*` server-side, never client-only
-- [ ] Upstash rate limit on login: 5 / 15 min / IP
-- [ ] Dashboard — drafts, recent activity
-- [ ] `Editor.tsx` — split-pane Markdown + live preview
-- [ ] `EditorToolbar.tsx` — bold, italic, heading, link (`Cmd+K`), code block
-      with language picker, image, embed, callout, spoiler, footnote, table
-- [ ] `ImageDropzone.tsx` — **drag-and-drop *and* clipboard paste**. Paste is
-      the path that matters most; screenshots are the dominant image source
-- [ ] Cloudinary upload route — validate type and size **server-side**
-- [ ] Alt text prompted on insert
-- [ ] `MediaLibrary.tsx` — browse and reuse
-- [ ] `TaxonomyPicker.tsx` — driven by `taxonomy.ts`
-- [ ] Autosave drafts
-- [ ] Signed preview URL — authenticated viewers only
-- [ ] Publish action — renders and caches `bodyHtml`, sets `publishedAt`
+| Unit | Branch | Owner |
+|---|---|---|
+| `models/User.ts` + admin seed (bcrypt 12) | `p3/user-model` | 🤖 |
+| `lib/auth/session.ts` — jose | `p3/session-jose` | 🤖 |
+| Auth attack suite | `p3/auth-tests` | 🧑 *(optional)* |
+| `middleware.ts` admin gate | `p3/middleware` | 🤖 |
+| `lib/client-ip.ts` + `lib/ratelimit.ts` | `p3/ratelimit` | 🤖 |
+| `/admin/login` | `p3/login` | 🤖 |
+| Admin shell + dashboard | `p3/admin-shell` | 🧑 |
+| `Editor.tsx` + toolbar + preview | `p3/editor` | 🤖 |
+| Cloudinary upload + `MediaLibrary` | `p3/media` | 🤖 |
+| `TaxonomyPicker` + autosave + signed preview | `p3/editor-support` | 🤖 |
+| Publish flow | `p3/publish` | 🤖 |
+| **CTF publish guards** | `p3/ctf-guards` | 🤖 |
+| CTF checklist **wording** | `p3/ctf-checklist-copy` | 🧑 |
 
-**Done when:** a complete post with pasted screenshots can be written and
-published entirely through the UI. Seeding is retired.
+### CTF guards ship with publish, not later
+
+Moved up from Phase 5. Otherwise there is a two-phase window in which an active
+HackTheBox writeup or a live flag can be published through your own UI — a real
+takedown risk, in your own subject area.
+
+- **Hard block:** `platform === 'HackTheBox' && retired !== true` → refuse
+- **Flag scanner:** `HTB{…}`, `THM{…}`, `flag{…}`, `picoCTF{…}`, `CTF{…}` →
+  refuse, show the offending line
+- **Checklist** required before any `ctf` publish; store `checklistAcceptedAt`
+
+> ⚠️ **`retired` fails closed.** Block when `undefined`, not only when `false`.
+> A new CTF post has no `retired` value until someone sets one.
+
+> ⚠️ **`x-forwarded-for` is attacker-controlled.** `xff.split(',')[0]` makes
+> every rate limit bypassable with a single header. On Vercel use
+> `x-vercel-forwarded-for`.
+
+> ⚠️ **`@upstash/ratelimit` fails open on a Redis outage.** Acceptable for
+> search; wrong for login, which must fail closed.
+
+> ⚠️ **Middleware is not the authorization boundary.** Every `/api/admin/*`
+> route checks the session itself. This is a Phase 3 invariant with a test, not
+> a Phase 8 audit item.
+
+> ⚠️ **`bcryptjs` does not run on the Edge runtime.** Password verification
+> lives in a Node route handler, never in middleware.
+
+**Gates:** `p3/session-jose` — app **refuses to boot** with `JWT_SECRET` unset;
+attack suite green (`alg:none`, stripped signature, replayed expiry, tampered
+`role`, cookie flags). `p3/ratelimit` — a spoofed `x-forwarded-for` does *not*
+reset the limit, asserted by test. `p3/publish` — either `p3/ctf-guards` is
+merged, or publish rejects `type: 'ctf'` with a test proving it.
+`p3/ctf-guards` — `curl` POST with the checklist unticked returns 4xx;
+`retired: undefined` is blocked.
+
+**Phase done when:** a full post with pasted screenshots is written and
+published entirely through the UI. Seeding retires.
 
 ---
 
 ## Phase 4 — Engagement
 
-### Likes
-- [ ] `models/Like.ts` — `{postId, visitorId}` unique compound index
-- [ ] Opaque visitor token in a long-lived cookie (not PII)
-- [ ] Optimistic UI, denormalized `likeCount`
-- [ ] Rate limit 20 / min
+| Unit | Branch | Owner |
+|---|---|---|
+| `lib/hash.ts` — HMAC IP hashing | `p4/ip-hash` | 🤖 |
+| Likes + visitor token | `p4/likes` | 🧑 |
+| `lib/auth/oauth.ts` — GitHub + Google | `p4/oauth` | 🤖 |
+| OAuth attack suite | `p4/oauth-tests` | 🧑 *(optional)* |
+| `models/Comment.ts` + `CommentUser.ts` | `p4/comment-models` | 🤖 |
+| `lib/comments/render.ts` — plain text | `p4/comment-render` | 🤖 |
+| `lib/comments/filters.ts` | `p4/comment-filters` | 🤖 |
+| Comment thread UI + form + sign-in prompt | `p4/comment-ui` | 🧑 |
+| Reports + auto-hide | `p4/reports` | 🧑 |
+| Admin queue + `/admin/commenters` | `p4/moderation` | 🤖 |
+| Share buttons + per-post OG | `p4/share` | 🧑 |
 
-### OAuth sign-in
-- [ ] Register GitHub and Google OAuth apps, set callback URLs
-- [ ] `lib/auth/oauth.ts` — state parameter for CSRF protection
-- [ ] `models/CommentUser.ts`
-- [ ] Sign-in prompt in the comment box
+**Register the GitHub and Google OAuth apps before this phase.** Free, ~10
+minutes, but nothing here works without them.
 
-### Comments — open, post-moderated
-- [ ] `models/Comment.ts`, default `status: 'visible'`
-- [ ] Threaded rendering
-- [ ] **Comment sanitizer schema** — no images, no headings, links forced
-      `rel="nofollow ugc noopener"`
-- [ ] `lib/comments/filters.ts`:
-  - [ ] Rate limit 3 / 10 min → reject
-  - [ ] Honeypot field → reject silently
-  - [ ] Submitted in < 3s → reject silently
-  - [ ] 3+ links → hold
-  - [ ] Spam pattern match → hold
-  - [ ] Author's first-ever comment → hold once, then `trusted = true`
-  - [ ] Banned author → reject
-- [ ] Reader reports; auto-hide at 3
-- [ ] `/admin/comments` — **held and reported only**, never the full firehose
-- [ ] `/admin/commenters` — trust / ban
-- [ ] IP hashing with server-side pepper
+> ⚠️ **Honeypot and timing rejections must return a fake success** and show the
+> comment to its author as if posted. A distinguishable error is an oracle a bot
+> tunes against.
 
-### Sharing
-- [ ] Share buttons, per-post OG cards
+> ⚠️ **`trusted` flips only on admin approval**, never on submission. Otherwise
+> one benign first comment buys a spammer permanent bypass.
 
-**Done when:** a signed-in reader's comment appears instantly, a link-stuffed
-comment lands in the queue instead, and the admin queue holds only exceptions.
+> ⚠️ **The unique compound index `{postId, visitorId}` is what enforces one
+> like per visitor** — not the cookie. Cookie deletion means a re-like; that's
+> accepted, and it's why this isn't an auth problem.
 
----
+> ⚠️ **IP hashing uses HMAC with a secret pepper, not a bare hash.** IPv4 has
+> only 2³² possible inputs — an unpeppered SHA-256 of an IP is exhaustively
+> reversed in seconds. The pepper's secrecy is the entire control. *(This
+> paragraph belongs on `/security` more or less verbatim.)*
 
-## Phase 5 — Specialized content types + publish guards
+**Gates:** `p4/oauth` — callback without `state` rejected; `returnTo=//evil.com`
+rejected. `p4/comment-filters` — honeypot hit indistinguishable from success;
+`trusted` flips only on approval. `p4/comment-ui` — admin queue exists, or the
+flag is off.
 
-- [ ] Facet landing pages with **real URLs** — `/ctf/platform/[platform]`,
-      `/ctf/difficulty/[level]`, `/ctf/category/[category]`,
-      `/tools/category/[category]`, `/policies/framework/[framework]`
-- [ ] Per-facet title, meta description and intro blurb from `taxonomy.ts`
-- [ ] Combined query-string filters → **`noindex`**
-- [ ] Tool pages — install commands, cheatsheet table
-- [ ] **Search indexes cheatsheet commands**, so `-oN` finds `nmap`
-- [ ] Cross-linking — tool pages list writeups that used them
-- [ ] Policy pages — framework navigation, downloads
-- [ ] Glossary — A–Z index, `seeAlso`, hover-cards from `shortDef`
-
-### CTF publish guards — `lib/publish/guards.ts`
-- [ ] **Hard block:** `platform === 'HackTheBox' && !retired` → refuse to publish
-- [ ] **Flag scanner:** regex sweep for `HTB{…}`, `THM{…}`, `flag{…}`,
-      `picoCTF{…}`, `CTF{…}` → refuse and show the offending line
-- [ ] `::flag[user]` directive → redacted render
-- [ ] Pre-publish checklist, required before any `ctf` post publishes:
-  - [ ] Screenshots contain no flag values
-  - [ ] No personal username, email, or identifying shell prompt
-  - [ ] No internal IPs beyond the target's own
-  - [ ] No session tokens, cookies or API keys in captured output
-  - [ ] Machine retired / room permits writeups
-- [ ] Store `checklistAcceptedAt`
-
-**These are blocks, not warnings.** HackTheBox issues takedowns for
-active-machine writeups, and the rule exists for exactly the moment it's
-forgotten. Image redaction stays manual — no scanner reliably finds a flag
-inside a screenshot, which is precisely how leaks happen.
-
-**Done when:** publishing an active HTB box is impossible, and a flag pasted
-into the body blocks publish.
+**Phase done when:** a signed-in reader's comment appears instantly, a
+link-stuffed one lands in the queue, and the queue holds only exceptions.
 
 ---
 
-## Phase 6 — Series + content freshness
+## Phase 5 — Specialized types, facets, search
 
-- [ ] `models/Series.ts`, `/admin/series` with drag-to-reorder
-- [ ] Series overview page — ordered, with progress
-- [ ] Prev/next navigation within a path
-- [ ] Reader progress in `localStorage` — **no account required**
-- [ ] `lastReviewedAt` set on publish
-- [ ] "Reviewed, still accurate" admin action
-- [ ] `StaleBanner` on posts older than 18 months
-- [ ] `/admin/review` — oldest first
-- [ ] Exclude `ctf` from freshness — historical records, not living guides
+| Unit | Branch | Owner |
+|---|---|---|
+| Facet landing pages (real URLs) | `p5/facets` | 🤖 |
+| Tool pages — install + cheatsheet table | `p5/tools` | 🧑 |
+| Policy pages + downloads | `p5/policies` | 🧑 |
+| Glossary A–Z index + term pages | `p5/glossary` | 🧑 |
+| Glossary hover-cards + in-post auto-linking | `p5/glossary-links` | 🤖 |
+| Search — two-path implementation | `p5/search` | 🤖 |
+| Cross-linking: tools ↔ writeups | `p5/cross-links` | 🤖 |
 
-**Done when:** a reader can follow a path start to finish, and a stale post
-visibly says so.
+Facets get **real URLs** — `/ctf/platform/[platform]`, `/ctf/difficulty/[level]`,
+`/tools/category/[category]`, `/policies/framework/[framework]` — each with its
+own title, meta description and blurb from `taxonomy.ts`. Combined query-string
+filters are `noindex`.
 
----
+> ⚠️ **`shortDef` is plain text, rendered as text — never HTML.** Otherwise it's
+> a second stored-XSS path bypassing the `bodyHtml` pipeline entirely.
 
-## Phase 7 — Newsletter + RSS
+> ⚠️ **Glossary auto-linking operates on the hast tree, never a regex over the
+> HTML string.** A string regex matches inside `<code>`, inside attribute
+> values, and inside existing anchors — the single most likely way to mangle
+> every page on the site at once.
 
-> **Blocked on a custom domain.** Resend cannot send from a `vercel.app`
-> subdomain — SPF/DKIM require DNS records on a domain you control. Not a Resend
-> limitation; it's how email authentication works, and unauthenticated mail goes
-> to spam. Everything except sending can be built and tested first.
-
-- [ ] `/rss.xml` — full feed
-- [ ] `models/Subscriber.ts`
-- [ ] Subscribe form, rate limited 3 / hour / IP
-- [ ] **Double opt-in** — confirmation email with random token
-- [ ] One-click unsubscribe via token, **no login required**
-- [ ] Buy domain, point DNS at Vercel
-- [ ] Verify domain in Resend (SPF + DKIM)
-- [ ] Newsletter composer — reads `status === 'published'` **only**
-- [ ] Send as a **separate explicit action**, never automatic on publish
-- [ ] Send confirmation dialog showing recipient count
-
-**Publish and send stay separate on purpose.** Publish, read it live, then
-choose to send. A typo caught after publishing never reaches an inbox.
-
-**Done when:** a test subscriber completes double opt-in and receives a real
-post.
+**Gate:** `p5/search` — searching `-oN` returns `nmap`; searching a prose phrase
+still works; neither path breaks the other.
 
 ---
 
-## Phase 8 — Hardening + `/security`
+## Phase 6 — Series + freshness
 
-- [ ] CSP with nonces, **no `unsafe-inline`**
-- [ ] HSTS, `X-Content-Type-Options: nosniff`,
-      `Referrer-Policy: strict-origin-when-cross-origin`
-- [ ] `Permissions-Policy` — deny camera, mic, geolocation
-- [ ] `/.well-known/security.txt` (RFC 9116) with contact + expiry
-- [ ] `npm audit`, dependency review
-- [ ] Confirm no secret is exposed via `NEXT_PUBLIC_*`
-- [ ] Verify every `/api/admin/*` route checks session server-side — middleware
-      alone is not sufficient
-- [ ] Self-directed pentest: XSS in comments and posts, IDOR on comment
-      edit/delete, rate-limit bypass, OAuth state/CSRF, SSRF via embeds
-- [ ] Write `/security` documenting all of it, with reasoning per control
+| Unit | Branch | Owner |
+|---|---|---|
+| `models/Series.ts` + `/admin/series` reorder | `p6/series-model` | 🤖 |
+| Series overview + prev/next | `p6/series-nav` | 🧑 |
+| Reader progress (localStorage) | `p6/progress` | 🧑 |
+| `lastReviewedAt` + review action | `p6/freshness` | 🤖 |
+| `StaleBanner` | `p6/stale-banner` | 🧑 |
+| `/admin/review` queue | `p6/review-queue` | 🧑 |
 
-The `/security` writeup is the strongest teaching artifact on the site — a real
-system with real controls and real reasoning beats any hypothetical.
+Freshness excludes `ctf` — writeups are historical records of a point in time,
+not living guides.
+
+**Gate:** a reader follows a path start to finish without an account; a post
+older than 18 months visibly says so.
+
+---
+
+## Phase 7 — Newsletter
+
+Ships **complete**. Only the send is gated.
+
+| Unit | Branch | Owner |
+|---|---|---|
+| `lib/email/provider.ts` + `ConsoleProvider` | `p7/email-provider` | 🤖 |
+| `models/Subscriber.ts` | `p7/subscriber-model` | 🤖 |
+| Subscribe form + rate limit | `p7/subscribe` | 🧑 |
+| Double opt-in state machine + tokens | `p7/opt-in` | 🤖 |
+| Unsubscribe flow | `p7/unsubscribe` | 🤖 |
+| Newsletter composer | `p7/composer` | 🤖 |
+| `ResendProvider` | `p7/resend` | 🤖 |
+
+```
+EmailProvider { send(msg): Promise<void>; canSendBulk: boolean }
+  ├── ConsoleProvider    logs confirm link to stdout        → dev + tests
+  ├── ResendDevProvider  real send, own address only        → smoke test
+  └── ResendProvider     verified domain                    → prod
+```
+
+Everything is built and tested against `ConsoleProvider` — deterministic, and
+better for testing than real email because there's no inbox to poll. The send
+button is disabled unless `provider.canSendBulk`.
+
+**A custom domain flips one env var.** Nothing sits half-finished on a branch.
+
+- Tokens are `crypto.randomBytes`, not predictable
+- Unsubscribe is idempotent, needs no login, and must not leak whether an
+  address was ever subscribed
+- The composer reads `status === 'published'` only
+- **Sending is a separate explicit action from publishing** — publish, read it
+  live, then choose to send. A typo caught after publishing never reaches an
+  inbox.
+
+**Gate:** double opt-in completes end to end against `ConsoleProvider`; the send
+button is provably disabled without `canSendBulk`.
+
+---
+
+## Phase 8 — Enforcement + pentest + `/security`
+
+| Unit | Branch | Owner |
+|---|---|---|
+| CSP report-only → enforce | `p8/csp-enforce` | 🤖 |
+| Dependency + `NEXT_PUBLIC_*` + route audits | `p8/audit` | 🧑 |
+| Self-directed pentest | `p8/pentest` | 🧑 |
+| `/security` writeup | `p8/security-page` | 🧑 |
+| `/about` | `p8/about` | 🧑 |
+
+Pentest scope: XSS in comments and posts, IDOR on comment edit/delete,
+rate-limit bypass, OAuth state/CSRF, SSRF via embeds, publish-guard bypass by
+direct API call.
+
+**The recurring definition of done for every control: bypass it with `curl`.**
+Checklist unticked → publish via the API anyway. Rate limit → spoofed header.
+Client-side validation → direct POST. Better gate than "looks right."
+
+> ⚠️ **Every claim on `/security` must map to a merged test or a code
+> reference.** A security page describing controls that don't exist is worse
+> than no page at all.
+
+**Gate:** `p8/csp-enforce` — zero violations in report-only for 7 days on the
+live site.
 
 ---
 
 ## Deferred
 
-Not in scope now; revisit only if a real need appears.
+Not in scope. Revisit only on real need.
 
 - Live-updating comments and view counters (websockets/SSE)
 - Multi-author support
-- Full-text search upgrade to Atlas Search — only if MongoDB text relevance
-  proves weak in practice
+- Atlas Search — only if the two-path search proves weak in practice
 - Analytics — if added, privacy-respecting (Plausible, Umami), not Google
   Analytics, which would be tonally wrong here
-- Block/WYSIWYG editor — revisit only if Markdown genuinely proves limiting
+- Block/WYSIWYG editor — only if Markdown genuinely proves limiting
+- Custom domain — see `README.md`; changes `EMAIL_PROVIDER` and nothing else

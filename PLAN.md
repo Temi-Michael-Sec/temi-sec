@@ -44,30 +44,69 @@ same idioms, no new frameworks to learn mid-build.
 | Auth | `jose` (JWT) + `bcryptjs` | Same pattern as `robofriends` |
 | Rate limiting | Upstash Redis | Already used in `robofriends` |
 | Images | Cloudinary | Free tier, CDN, auto-transforms |
-| Email | Resend | Free tier ~3k/mo, needs a domain |
-| Hosting | Vercel | |
+| Email | Resend | Free tier ~3k/mo. Sending needs a custom domain — §12 |
+| Hosting | Vercel | Free `*.vercel.app`, no custom domain — §12 |
 
 ### Markdown pipeline
+
+**Order is load-bearing.** Two earlier drafts of this pipeline were subtly wrong
+in ways that would have shipped looking correct — see the notes below.
 
 ```
 markdown source (DB)
   → remark-parse
-  → remark-gfm            tables, strikethrough, task lists
-  → remark-directive      ::: custom blocks (spoiler, callout)
-  → remark-footnotes      [^1] citations
+  → remark-gfm            tables, strikethrough, task lists, [^1] footnotes
+  → remark-directive      ::: custom blocks (callout, spoiler, flag), ::youtube
   → remark-rehype
   → rehype-slug           heading IDs for the TOC
   → rehype-autolink-headings
-  → rehype-shiki          syntax highlighting (VS Code engine)
-  → rehype-sanitize       ← SECURITY CRITICAL, see §6
-  → HTML
+  → rehype-sanitize       ← SECURITY CRITICAL, see §10
+  → @shikijs/rehype       syntax highlighting, AFTER sanitize (see below)
+  → HTML  → bodyHtml
 ```
 
 Rendered at publish time and cached, not on every request.
 
 **`rehype-sanitize` is not optional.** Markdown permits raw HTML. Without
-sanitization, anything that reaches the renderer can inject script. This matters
-for post bodies and matters *enormously* for comments.
+sanitization, anything reaching the renderer can inject script.
+
+#### Why sanitize runs *before* Shiki
+
+Shiki emits inline `style` attributes (`<span style="color:#89ddff">`). The
+sanitizer strips `style`, so highlighting run *before* sanitization silently
+disappears — and the obvious fix, allowlisting `style`, opens CSS injection.
+
+Running Shiki **after** sanitization avoids the conflict entirely. This is safe
+because Shiki only transforms `<pre><code>` content and escapes what it emits,
+so its output is trusted by construction.
+
+#### Why `::youtube` must not emit an `<iframe>`
+
+If the directive produced an `<iframe>` before sanitization, the schema would
+have to allow iframes — and a **raw `<iframe>` written directly in Markdown
+would then survive too**. `rehype-sanitize` can restrict URL protocols but
+cannot constrain a `src` to a specific host, so there is no way to narrow it
+back down.
+
+Instead the directive emits:
+
+```html
+<div data-youtube-id="dQw4w9WgXcQ"></div>
+```
+
+The ID is validated against `^[A-Za-z0-9_-]{11}$` at parse time. The sanitizer
+allowlists exactly that one data attribute. A client component reads it and
+builds the iframe. **`<iframe>` never enters the allowlist.**
+
+#### Package notes
+
+- `remark-gfm` v3+ already provides `[^1]` footnotes. Do **not** also install
+  `remark-footnotes` — they conflict.
+- Use `@shikijs/rehype`. `rehype-shiki` is the legacy package.
+
+#### Comments do not use this pipeline at all
+
+Comments are plain text — no Markdown parser, no sanitizer schema. See §7.
 
 ---
 
@@ -100,6 +139,7 @@ useful.
   readingTime:  number          // minutes
   views:        number
   likeCount:    number
+  searchTokens: string[]        // exact-match commands/flags — structure.md §2.14
   seo:          { metaTitle, metaDescription, ogImage }
 }
 ```
@@ -115,7 +155,7 @@ useful.
   os:          'Linux' | 'Windows' | 'Other'
   categories:  string[]   // Web, Crypto, Forensics, Pwn, RE, OSINT
   toolsUsed:   string[]   // ← links back to the tool library
-  retired:     boolean    // gate active-box writeups
+  retired:     boolean    // fails CLOSED — undefined blocks too, see §8
 }
 ```
 
@@ -127,14 +167,14 @@ useful.
   officialUrl:     string
   platforms:       string[]    // Linux, Windows, macOS
   installCommands: [{ platform, command }]
-  cheatsheet:      [{ command, description }]   // searchable table
+  cheatsheet:      [{ command, description }]   // feeds searchTokens
 }
 ```
 
 **`policy`** — GRC-side material
 ```ts
 {
-  framework:  'ISO27001' | 'NIST-CSF' | 'SOC2' | 'GDPR' | 'General'
+  framework:  'ISO27001' | 'NIST-CSF' | 'SOC2' | 'GDPR' | 'PCI-DSS' | 'General'
   version:    string
   downloads:  [{ label, url, format, sizeBytes }]
 }
@@ -168,7 +208,8 @@ useful.
 {
   postId, parentId,
   authorId,                    // → CommentUser, never anonymous
-  body, bodyHtml,
+  body,                        // RAW TEXT — not markdown, not HTML
+  bodyHtml,                    // escaped + <br> + <code>, see structure.md §4.2
   status: 'visible' | 'held' | 'spam' | 'removed',   // default 'visible'
   heldReason: string | null,   // why the filter caught it
   reportCount: number,
@@ -181,9 +222,13 @@ See §7 for the moderation model.
 **`CommentUser`** — OAuth identity, no passwords
 `{ provider: 'github'|'google', providerId, displayName, avatarUrl,
    trusted: boolean, banned: boolean, commentCount, createdAt }`
-`trusted` flips to `true` after a first approved comment, so returning
-commenters skip the first-post hold. No email/password is ever stored — account
-recovery, password reset, and credential-breach risk are all designed out.
+
+**`trusted` flips to `true` only when an admin approves a held comment.** Never
+on submission. If a first submission granted trust automatically, a spammer
+would buy a permanent bypass with one benign comment.
+
+No email/password is ever stored — account recovery, password reset, and
+credential-breach risk are all designed out.
 
 **`Like`**
 `{ postId, visitorId, createdAt }` — `visitorId` is an opaque token in a
@@ -374,29 +419,47 @@ volume, so the overwhelming majority of spam never reaches the filters.
 For a technical audience this is near-zero friction; on a general-interest site
 it would not be.
 
-### Layer 2 — automated filters
+### Layer 2 — plain text (removes the payload class entirely)
+
+Comment bodies are **plain text**. No Markdown parser, no sanitizer allowlist —
+just escape, `<br>`, and backtick→`<code>`. Full spec in `structure.md` §4.2.
+
+Two consequences:
+
+- **No XSS surface on the untrusted path.** There is no parser to exploit and no
+  schema to get subtly wrong.
+- **Link spam becomes pointless.** URLs render as text, never anchors, so there
+  is no SEO value in posting one. The link filter below is a convenience, not a
+  control.
+
+### Layer 3 — automated filters
 
 | Signal | Action |
 |---|---|
+| Author `banned` | Rejected |
 | Rate limit exceeded (3 / 10 min) | Rejected |
-| Honeypot filled, or submitted in < 3s | Rejected silently |
+| Honeypot filled, or submitted in < 3s | **Fake success** — see below |
 | 3+ links in body | Held |
 | Spam-pattern match (crypto, SEO, casino) | Held |
-| Author's first-ever comment | Held once, then `trusted = true` |
-| Author `banned` | Rejected |
+| Author's first-ever comment | Held once |
 | Everything else | **Visible immediately** |
 
-### Layer 3 — reader reports
+**Honeypot and timing rejections must return an ordinary success response** and
+show the comment to its author as if posted. A distinguishable error turns the
+filter into an oracle a bot can tune against.
+
+### Layer 4 — reader reports
 
 Any signed-in reader can report a comment. At 3 reports it auto-hides and enters
 the queue. The crowd surfaces what the filters miss.
 
-### Layer 4 — the admin queue
+### Layer 5 — the admin queue
 
 Only `held` and reported comments appear. Expected volume is a handful per week
 rather than everything. Actions: approve, spam, remove, ban author.
 
-Approving also sets `trusted`, so that person never gets held again.
+**Approving is the only thing that sets `trusted = true`.** Submission never
+does. Otherwise one benign first comment buys a spammer permanent bypass.
 
 ---
 
@@ -465,11 +528,12 @@ premise. This section is also the source material for the public `/security`
 page.
 
 ### Content rendering
-- `rehype-sanitize` with an explicit allowlist schema on **all** rendered
-  Markdown
-- Comments sanitized with a *stricter* schema than posts — no images, no
-  headings, links forced to `rel="nofollow ugc noopener"` + `target="_blank"`
-- No raw HTML passthrough anywhere; embeds only via controlled directives
+- `rehype-sanitize` with an explicit allowlist schema on all rendered Markdown,
+  running **before** Shiki (§2)
+- **Comments bypass the Markdown pipeline entirely** — plain text, no parser,
+  no allowlist (§7, `structure.md` §4.2)
+- No raw HTML passthrough anywhere; embeds only via controlled directives that
+  emit data attributes, never `<iframe>`
 
 ### Auth
 - `bcryptjs` cost factor 12
@@ -490,11 +554,12 @@ page.
 
 ### Comments
 - Sign-in required (OAuth) — identity is the primary spam control
-- Comments render **immediately**; only flagged ones are held. See §7.
-- Honeypot field + submission-timing check instead of CAPTCHA
-- IP stored hashed with a server-side pepper, never plaintext
-- Stricter sanitizer schema than posts: no images, no headings, links forced to
-  `rel="nofollow ugc noopener"`
+- **Plain text only** — no parser on the untrusted path (§7)
+- Comments render **immediately**; only flagged ones are held
+- Honeypot + timing check instead of CAPTCHA, both returning fake success
+- IP stored hashed with **HMAC + a server-side pepper**, never plaintext. The
+  pepper is the entire control here: IPv4 has only 2³² possible inputs, so a
+  bare hash is brute-forced in seconds.
 
 ### Headers (middleware)
 - Content-Security-Policy — no `unsafe-inline`; nonce-based where scripts are needed
@@ -574,20 +639,46 @@ That writeup is itself a portfolio piece.
   dropped. This is what allows comments to be open and instant (§7).
 - **Comment moderation** → post-moderation, not pre-moderation. Filters and
   reports feed a small queue instead of the admin gating every comment.
-- **Hosting domain** → `*.vercel.app` for now. Free, and its Public Suffix List
-  membership actually gives better cookie isolation than a custom domain.
+- **Hosting domain** → **stay free on `*.vercel.app`.** Upgrade later only if the
+  newsletter earns it.
+- **Email provider** → Resend behind an `EmailProvider` interface, never Gmail
+  SMTP. Free Gmail caps at ~100/day over SMTP, enforces behavioural blocks below
+  that, and mail from `@gmail.com` fails DMARC alignment — so it reads as
+  phishing while also being a throwaway adapter and a long-lived app password to
+  manage. Resend's free tier already sends without a domain (self only), using
+  the same library production ships.
+- **Comment rendering** → plain text. No parser on the untrusted path (§7).
 
 ### Outstanding
 
-- **Custom domain — blocks Phase 7.** Resend cannot send from a `vercel.app`
-  subdomain: SPF/DKIM verification needs DNS records on a domain you control.
-  This is how email authentication works, not a Resend limitation, and mail
-  without it lands in spam. Phases 0–6 are unaffected. A domain costs roughly
-  $10–15/year and is also better for SEO and for `security.txt`.
+- **Custom domain — gates newsletter *sending* only.** Resend cannot send from a
+  `vercel.app` subdomain: SPF/DKIM need DNS records on a domain you control.
+  That is how email authentication works, not a Resend limitation.
+
+  Phase 7 still ships **complete** — subscriber model, double opt-in, tokens,
+  unsubscribe and composer are all built and tested against `ConsoleProvider`,
+  which is better for testing than real email because it is deterministic. The
+  send button is gated on `provider.canSendBulk`. A domain flips one env var.
+
+  Cost of deferring, stated honestly: migrating after Google indexes the site
+  loses ranking, and clean redirects cannot be set from a `*.vercel.app`
+  subdomain. `NEXT_PUBLIC_SITE_URL` keeps the code damage to one variable; the
+  SEO cost is real and unavoidable.
+
+  Correction to an earlier draft of this plan: it claimed `vercel.app`'s Public
+  Suffix List membership gives better cookie isolation than a custom domain.
+  That protection only ever applied against *other Vercel tenants*, and the
+  `__Host-` cookie prefix — which the admin session uses regardless of host —
+  provides equivalent subdomain-injection protection anywhere. It is not a
+  reason to stay.
 - **OAuth app registration** — GitHub and Google OAuth apps must be created and
   their callback URLs registered before Phase 4. Free, but needs doing.
-- **Search** — starting with MongoDB text indexes, and the index must cover tool
-  cheatsheet commands as well as prose, so searching `-oN` finds `nmap`. If
-  relevance proves weak, Atlas Search is the upgrade path.
+- **Search** — **two paths, not one.** An earlier draft of this plan claimed a
+  MongoDB text index could cover cheatsheet commands so that `-oN` finds `nmap`.
+  It cannot: a leading `-` in `$text` means *negation*, and the tokenizer strips
+  punctuation before indexing, so command flags never survive as searchable
+  terms. Prose goes through `$text`; command-shaped queries go through an
+  exact-match `searchTokens[]` index populated at publish (`structure.md`
+  §2.14). If relevance proves weak, Atlas Search replaces both cleanly.
 - **Analytics** — deferred. If added, something privacy-respecting (Plausible,
   Umami) rather than Google Analytics, which would be tonally wrong here.

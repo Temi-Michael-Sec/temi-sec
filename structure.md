@@ -139,22 +139,26 @@ blog-page/
 │   │   │   ├── admin.ts
 │   │   │   └── oauth.ts            GitHub + Google
 │   │   ├── markdown/
-│   │   │   ├── render.ts           Full pipeline
-│   │   │   ├── sanitize-schema.ts  Post schema + stricter comment schema
+│   │   │   ├── render.ts           Post pipeline (§4.1)
+│   │   │   ├── sanitize-schema.ts  Posts only — comments have no schema
 │   │   │   ├── directives.ts       callout, spoiler, flag, youtube
-│   │   │   └── toc.ts
+│   │   │   └── toc.ts              from hast AFTER rehype-slug, not from source
 │   │   ├── publish/
 │   │   │   ├── guards.ts           Active-machine block, flag scanner
 │   │   │   └── flag-patterns.ts
 │   │   ├── comments/
+│   │   │   ├── render.ts           escape + <br> + <code>. No parser. (§4.2)
 │   │   │   ├── filters.ts          Rate, honeypot, links, patterns
 │   │   │   └── moderation.ts
 │   │   ├── cloudinary.ts
 │   │   ├── email/
+│   │   │   ├── provider.ts         EmailProvider interface + canSendBulk gate
+│   │   │   ├── console.ts          dev — logs confirm link, deterministic
 │   │   │   ├── resend.ts
 │   │   │   └── templates/
-│   │   ├── ratelimit.ts            Upstash
-│   │   ├── hash.ts                 IP hashing with pepper
+│   │   ├── ratelimit.ts            Upstash — see trap note in implementation.md
+│   │   ├── client-ip.ts            x-vercel-forwarded-for, NOT raw x-forwarded-for
+│   │   ├── hash.ts                 HMAC-SHA256 IP hashing with server-side pepper
 │   │   ├── reading-time.ts
 │   │   └── seo.ts
 │   │
@@ -209,11 +213,25 @@ base fields, type-specific extensions.
 | `readingTime` | number | minutes |
 | `views` | number | |
 | `likeCount` | number | denormalized from `Like` |
+| `searchTokens` | string[] | exact-match tokens — see §2.14 |
 | `seo` | `{metaTitle, metaDescription, ogImage}` | |
 
-**Indexes:** `slug` unique · `{type, status, publishedAt: -1}` ·
-`{tags}` · text index over `title`, `excerpt`, `body` **and tool cheatsheet
-commands**.
+### Indexes — two constraints that bite
+
+```
+slug                         unique
+{type, status, publishedAt}  compound, -1 on publishedAt
+{tags}
+{searchTokens}
+{title, excerpt, body}       TEXT — declared ONCE on the base schema
+```
+
+**MongoDB allows exactly one text index per collection**, and discriminators all
+share one collection. The text index must therefore be declared on the *base*
+schema, never on a discriminator. Declaring it twice fails at index build —
+which happens in production, on deploy, not locally.
+
+**The text index cannot cover command syntax.** See §2.14.
 
 ### 2.2 `ctf` discriminator
 
@@ -237,7 +255,7 @@ commands**.
 | `officialUrl` | string |
 | `platforms` | string[] |
 | `installCommands` | `[{platform, command}]` |
-| `cheatsheet` | `[{command, description}]` — **indexed for search** |
+| `cheatsheet` | `[{command, description}]` — feeds `searchTokens`, see §2.14 |
 
 ### 2.4 `policy` discriminator
 
@@ -275,8 +293,8 @@ No cover image, no TOC — feed-style presentation.
 | `postId` | ObjectId | indexed |
 | `parentId` | ObjectId \| null | threading |
 | `authorId` | ObjectId | → `CommentUser`, **never anonymous** |
-| `body` | string | Markdown, restricted subset |
-| `bodyHtml` | string | **stricter sanitizer than posts** |
+| `body` | string | **raw text** — not Markdown, not HTML |
+| `bodyHtml` | string | escaped + `<br>` + `<code>`, see §4.2 |
 | `status` | enum | `visible` (default) `held` `spam` `removed` |
 | `heldReason` | string \| null | which filter caught it |
 | `reportCount` | number | auto-hides at 3 |
@@ -290,8 +308,9 @@ No cover image, no TOC — feed-style presentation.
 `{ provider: 'github'|'google', providerId, displayName, avatarUrl,
    trusted: boolean, banned: boolean, commentCount, createdAt }`
 
-No email, no password. `trusted` flips true after a first approved comment, so
-returning commenters skip the first-post hold.
+No email, no password. **`trusted` flips true only on admin approval of a held
+comment — never on submission.** Otherwise one benign first comment buys a
+spammer a permanent bypass.
 
 **Index:** `{provider, providerId}` unique.
 
@@ -315,6 +334,35 @@ Both tokens are cryptographically random. Unsubscribe requires no login.
 ### 2.13 `User` — admin
 
 `{ email (unique), passwordHash, role, lastLoginAt }`
+
+### 2.14 `searchTokens` — why a plain text index is not enough
+
+The goal is that searching `-oN` finds `nmap`. **MongoDB `$text` cannot do
+this**, for two independent reasons:
+
+1. A leading `-` in a `$text` query string means **negation**. `$text: "-oN"`
+   asks for documents *excluding* "oN".
+2. The text tokenizer strips punctuation and splits on it, so `-oN`, `--script`
+   and `-sV` never survive as searchable terms in the first place.
+
+So command syntax needs an exact-match path alongside the prose path.
+
+**`searchTokens: string[]`** — populated at publish from:
+- `cheatsheet[].command` and `installCommands[].command` (tool posts)
+- flags extracted by `/(?:^|\s)(--?[A-Za-z][\w-]*)/g`
+- `toolName`, `aliases`, `term`
+
+Stored verbatim, case-preserved, indexed as a normal multikey index.
+
+**Two-path search** in `api/search/route.ts`:
+
+| Query shape | Path |
+|---|---|
+| Matches `/^-{1,2}[A-Za-z]/` or contains no spaces + has punctuation | `{ searchTokens: query }` exact match |
+| Anything else | `$text: { $search: query }` |
+| Ambiguous | Run both, merge, dedupe by `_id` |
+
+If relevance proves weak later, Atlas Search replaces both paths cleanly.
 
 ---
 
@@ -345,33 +393,78 @@ available as a secondary layer where fragmentation is harmless.
 
 ---
 
-## 4. Markdown pipeline
+## 4. Rendering — two separate paths
+
+Posts and comments render through **completely different code**. This is
+deliberate: the untrusted-input path contains no parser at all.
+
+### 4.1 Post pipeline — `lib/markdown/render.ts`
 
 ```
 body (Markdown, in DB)
   → remark-parse
-  → remark-gfm                tables, strikethrough, task lists
+  → remark-gfm                tables, strikethrough, task lists, [^1] footnotes
   → remark-directive          ::: callout / spoiler / flag, ::youtube
-  → remark-footnotes          [^1] citations
   → remark-rehype
   → rehype-slug               heading IDs for the TOC
   → rehype-autolink-headings
-  → rehype-shiki              syntax highlighting
   → rehype-sanitize           ← SECURITY CRITICAL
+  → @shikijs/rehype           highlighting, AFTER sanitize
   → bodyHtml (cached at publish)
 ```
 
 Rendered **at publish time**, not per request.
 
-Two sanitizer schemas in `sanitize-schema.ts`:
+**Order is load-bearing — three rules:**
 
-| | Posts | Comments |
-|---|---|---|
-| Images | ✅ | ❌ |
-| Headings | ✅ | ❌ |
-| Code blocks | ✅ | inline only |
-| Links | ✅ | ✅ forced `nofollow ugc noopener` |
-| Raw HTML | ❌ | ❌ |
-| `<iframe>` / `<script>` | ❌ | ❌ |
+1. **Sanitize before Shiki.** Shiki emits inline `style`; the sanitizer strips
+   it, so highlighting placed earlier vanishes silently. Allowlisting `style`
+   to "fix" it opens CSS injection. Shiki after sanitize is safe because it only
+   transforms `<pre><code>` and escapes its own output.
+2. **`::youtube` emits `<div data-youtube-id="…">`, never an `<iframe>`.** ID
+   validated `^[A-Za-z0-9_-]{11}$`. A client component builds the iframe.
+   `rehype-sanitize` cannot constrain a `src` to a host, so allowing iframes at
+   all would let a raw `<iframe>` in Markdown source through.
+3. **`remark-gfm` provides footnotes.** Do not also install `remark-footnotes`.
 
-Embeds are produced by directives so the exact output HTML is controlled.
+Single sanitizer schema in `lib/markdown/sanitize-schema.ts` (posts only):
+
+| | Allowed |
+|---|---|
+| Headings, lists, tables, blockquote | ✅ |
+| Images | ✅ |
+| Code blocks + inline code | ✅ |
+| Links | ✅ `rel="noopener"`, protocol-restricted |
+| `data-youtube-id` on `div` | ✅ (the only data attribute) |
+| `data-callout`, `data-spoiler` on `div` | ✅ |
+| Raw HTML, `style` | ❌ |
+| `<iframe>`, `<script>`, `<object>`, `<embed>` | ❌ |
+
+### 4.2 Comment renderer — `lib/comments/render.ts`
+
+**Plain text. No Markdown parser. No sanitizer schema. No allowlist.**
+
+```
+body (raw text, in DB)
+  → escapeHtml()        & < > " '  →  entities.  ALL of it, first.
+  → backticks           `code` → <code>code</code>   (content already escaped)
+  → newlines            \n → <br>
+  → bodyHtml
+```
+
+That is the entire function. Three transforms over already-escaped text.
+
+| | Comments |
+|---|---|
+| Inline `code` | ✅ — inert element, no attributes |
+| Line breaks | ✅ |
+| **Everything else** | ❌ — rendered as literal text |
+| Links | ❌ — URLs display as copyable text, not anchors |
+
+**Why this instead of an allowlist:** removing the Markdown parser removes it as
+an attack surface. No mXSS, no schema to maintain, no parser CVE to inherit on
+the one path that accepts input from strangers.
+
+**Side effect worth knowing:** because URLs never become anchors, link spam has
+no SEO value whatsoever. That demotes the link-count filter in §7 from
+load-bearing to a nice-to-have.

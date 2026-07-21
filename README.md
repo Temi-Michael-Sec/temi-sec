@@ -42,7 +42,10 @@ Ranked — when they conflict, the higher one wins.
   category and tools used, so they are *filterable*: "every Medium Linux box
   where I used `linpeas`."
 * **Tool Library** — install steps, flag cheatsheets and real usage examples.
-  Cheatsheet commands are indexed by search, so `-oN` finds `nmap`.
+  Cheatsheet commands and flags are extracted into an exact-match token index at
+  publish, so searching `-oN` finds `nmap`. (A plain MongoDB text index cannot
+  do this — a leading `-` means negation and the tokenizer eats punctuation, so
+  search runs two paths. See `structure.md` §2.14.)
 * **Security Policies** — downloadable templates mapped to ISO 27001, NIST CSF,
   SOC 2, GDPR and PCI DSS, with explanations.
 * **Notes** — short-form TIL entries. Keeps the site alive between long posts.
@@ -61,8 +64,8 @@ Ranked — when they conflict, the higher one wins.
   spoiled.
 * **Footnote citations** plus a structured References field (title, URL, date
   accessed) for CVEs, advisories and vendor docs.
-* **Video embeds** through a controlled directive — raw `<iframe>` is rejected
-  by the sanitizer.
+* **Video embeds** through a controlled directive. Raw `<iframe>` is never
+  allowed — the directive emits a validated data attribute instead.
 
 ### 3. Effortless categorisation, built for SEO
 
@@ -79,11 +82,19 @@ Ranked — when they conflict, the higher one wins.
 ### 4. Open comments that don't drown you in moderation
 
 * **Comments appear immediately.** No approval wait.
+* **Plain text only** — comments never touch a Markdown parser. Rendering is
+  escape → `<br>` → backtick `<code>`, and nothing else. There is no allowlist
+  to maintain and no parser to inherit a CVE from on the one path that accepts
+  input from strangers. URLs render as copyable text, not anchors, which also
+  means link spam has zero SEO value.
 * **OAuth sign-in (GitHub / Google)** is the primary spam control — bots don't
   provision OAuth accounts at volume. No passwords are ever stored.
 * Layered automatic filters hold only *suspicious* comments: rate limits,
   honeypot, timing check, link-count and pattern matching, and a one-time hold
-  on a commenter's first post.
+  on a commenter's first post. Honeypot and timing rejections return a **fake
+  success**, so the filter can't be used as an oracle.
+* A commenter becomes `trusted` **only when an admin approves a held comment** —
+  never on submission, or one benign first post would buy a permanent bypass.
 * Reader reports auto-hide a comment at 3 reports.
 * The admin queue therefore contains a handful of items per week, not everything.
 
@@ -132,19 +143,31 @@ in `localStorage` — no account needed to follow a path.
 The site is a security portfolio; it being compromised would undercut its whole
 premise. Full detail in [`PLAN.md`](PLAN.md) §10.
 
-* **`rehype-sanitize` on all rendered Markdown**, with a *stricter* schema for
-  comments than for posts — no images, no headings, links forced to
-  `rel="nofollow ugc noopener"`. Markdown permits raw HTML; unsanitized Markdown
-  rendering is an XSS sink.
-* No raw `<iframe>` or `<script>` anywhere. Embeds only via controlled directives.
+* **`rehype-sanitize` on all rendered Markdown.** Markdown permits raw HTML;
+  unsanitized Markdown rendering is an XSS sink. Sanitization runs **before**
+  Shiki, because Shiki emits inline `style` that the sanitizer would otherwise
+  strip — and allowlisting `style` to "fix" that opens CSS injection.
+* **Comments bypass the Markdown pipeline entirely** — plain text, no parser,
+  no schema.
+* No raw `<iframe>` or `<script>` anywhere. The video directive emits
+  `<div data-youtube-id>` with a validated ID and a client component builds the
+  frame, because `rehype-sanitize` can't constrain an iframe `src` to a host —
+  allowing iframes at all would let a hand-written one through.
 * Admin sessions signed with `jose`; cookies `httpOnly` + `secure` +
   `sameSite=strict`. Fails closed if `JWT_SECRET` is unset — no insecure fallback.
 * `bcryptjs` cost 12. Generic login failure message — no user enumeration.
-* All `/admin/*` gated in middleware, not client-side.
-* Upstash rate limiting on login, comments, likes, subscribe and search.
+* All `/admin/*` gated in middleware — **and every `/api/admin/*` route
+  re-checks the session itself.** Middleware alone has historically been
+  bypassable, so it is defence in depth, not the boundary.
+* Upstash rate limiting on login, comments, likes, subscribe and search — keyed
+  on `x-vercel-forwarded-for`, never raw `x-forwarded-for` (which is
+  attacker-controlled, so `xff.split(',')[0]` makes every limit bypassable with
+  one header).
 * CSP without `unsafe-inline`, plus HSTS, `nosniff`, `Referrer-Policy` and a
   restrictive `Permissions-Policy`.
-* IPs stored hashed with a server-side pepper, never plaintext.
+* IPs stored as **HMAC-SHA256 with a server-side pepper**, never plaintext. The
+  pepper's secrecy is the whole control — IPv4 has only 2³² possible inputs, so
+  an unpeppered hash is exhaustively reversed in seconds.
 * `/.well-known/security.txt` ([RFC 9116](https://www.rfc-editor.org/rfc/rfc9116))
   so anyone finding a vulnerability has a disclosure channel.
 
@@ -163,8 +186,8 @@ premise. Full detail in [`PLAN.md`](PLAN.md) §10.
 | Rate limiting | Upstash Redis |
 | Markdown | `unified` / remark / rehype + Shiki |
 | Images | Cloudinary |
-| Email | Resend |
-| Hosting | Vercel |
+| Email | Resend (`EMAIL_PROVIDER` switch) |
+| Hosting | Vercel — free `*.vercel.app` |
 
 ---
 
@@ -181,13 +204,15 @@ npm run dev
 ### Environment variables
 
 ```bash
-# Database
+# Database — fill this in from MongoDB Atlas
 MONGODB_URI=
 
-# Admin session — app fails closed if unset
+# Admin session — app REFUSES TO BOOT if unset. No insecure fallback.
 JWT_SECRET=
 
-# Hashing pepper for IP storage
+# HMAC pepper for IP hashing. Must be secret and must never rotate casually
+# (rotating orphans every stored ipHash). IPv4 is only 2^32 inputs, so without
+# this an ipHash is brute-forceable in seconds — the pepper IS the control.
 IP_HASH_PEPPER=
 
 # Cloudinary
@@ -205,11 +230,15 @@ GOOGLE_CLIENT_SECRET=
 UPSTASH_REDIS_REST_URL=
 UPSTASH_REDIS_REST_TOKEN=
 
-# Email (Phase 7 — requires a custom domain, see below)
+# Email — console | resend-dev | resend
+# console:    logs the confirm link to stdout. Deterministic, best for testing.
+# resend-dev: real sends, but only to your own verified address.
+# resend:     requires a verified custom domain. Only this sets canSendBulk.
+EMAIL_PROVIDER=console
 RESEND_API_KEY=
 NEWSLETTER_FROM_EMAIL=
 
-# Public
+# Public — the single canonical-URL source. Changing hosts is one variable.
 NEXT_PUBLIC_SITE_URL=
 ```
 
@@ -217,15 +246,48 @@ Nothing sensitive goes in a `NEXT_PUBLIC_*` variable.
 
 ---
 
-## ⚠️ Known constraint: newsletter needs a custom domain
+## ⚠️ Known constraint: newsletter sending needs a custom domain
 
-The site runs on `*.vercel.app` for Phases 0–6 at no cost.
+**Decision: stay free on `*.vercel.app`.** Upgrade to a custom domain later if
+the newsletter becomes worth it.
 
-**Resend cannot send email from a `vercel.app` subdomain.** Sending requires
-SPF and DKIM DNS records on a domain you control, and Vercel's DNS isn't yours.
-This is how email authentication works rather than a Resend restriction — mail
-sent without it goes to spam.
+**Resend cannot send from a `vercel.app` subdomain.** SPF and DKIM require DNS
+records on a domain you control, and Vercel's DNS isn't yours. This is how email
+authentication works rather than a Resend restriction — unauthenticated mail
+lands in spam.
 
-So Phase 7 sending needs a custom domain (~$10–15/year). Email *collection*
-works fine before then. A custom domain is also better for SEO and for
-`security.txt`.
+### What this actually blocks
+
+Only the **send**. Everything else ships:
+
+| | Works on `vercel.app` |
+|---|---|
+| RSS feed | ✅ — and it's the primary subscription channel now |
+| Subscribe form, storing subscribers | ✅ |
+| Double opt-in state machine, tokens, unsubscribe | ✅ — built and tested against `ConsoleProvider` |
+| Newsletter composer | ✅ |
+| Actually sending to subscribers | ❌ — gated on `provider.canSendBulk` |
+
+So Phase 7 is **built complete**, not deferred. A domain flips `EMAIL_PROVIDER`
+and nothing else.
+
+### Why not Gmail SMTP
+
+It works and there's a reusable pattern in `tcn-lekki/src/lib/mail.ts`, but:
+free Gmail caps at **~100/day via SMTP** (stricter than its 500/day web limit),
+Google enforces behavioural blocks well below that, and a confirmation email
+from `@gmail.com` fails DMARC alignment and reads as phishing. It would also
+mean a throwaway adapter plus a long-lived app password to manage. Resend's free
+tier already sends without a domain (self only), using the same library that
+ships in production.
+
+### The cost of migrating later
+
+Honest tradeoff, since this is the free option: moving domains after Google has
+indexed the site loses ranking, and you can't cleanly set redirects from a
+`*.vercel.app` subdomain. Keeping `NEXT_PUBLIC_SITE_URL` as the single canonical
+source limits the code damage to one variable, but the SEO cost is real.
+
+One thing that does *not* change: the admin session uses the `__Host-` cookie
+prefix regardless of host, which gives subdomain-injection protection
+independent of the Public Suffix List.
