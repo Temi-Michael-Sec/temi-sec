@@ -173,7 +173,8 @@ blog-page/
 │   │   └── User.ts                 Admin
 │   │
 │   ├── types/
-│   └── middleware.ts               Admin gate + security headers
+│   └── proxy.ts                    Optimistic admin gate. Next 16 renamed
+│                                   middleware→proxy; runtime is nodejs.
 │
 ├── public/
 │   └── .well-known/security.txt

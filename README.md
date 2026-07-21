@@ -4,8 +4,9 @@ A publishing platform for cybersecurity writing — articles, CTF writeups, a
 searchable tool reference, security policy templates, and structured learning
 paths. Built to be **used during real work**, not just read once.
 
-> **Status: planning.** Nothing is built yet. This README describes the intended
-> system. See [`implementation.md`](implementation.md) for build progress.
+> **Status: Phase 0 complete.** Foundation, CI and static security headers are
+> in. The content engine is next. See [`implementation.md`](implementation.md)
+> for progress and [`PLAN.md`](PLAN.md) for the reasoning.
 
 ---
 
@@ -156,9 +157,10 @@ premise. Full detail in [`PLAN.md`](PLAN.md) §10.
 * Admin sessions signed with `jose`; cookies `httpOnly` + `secure` +
   `sameSite=strict`. Fails closed if `JWT_SECRET` is unset — no insecure fallback.
 * `bcryptjs` cost 12. Generic login failure message — no user enumeration.
-* All `/admin/*` gated in middleware — **and every `/api/admin/*` route
-  re-checks the session itself.** Middleware alone has historically been
-  bypassable, so it is defence in depth, not the boundary.
+* All `/admin/*` gated in `proxy.ts` — **and every `/api/admin/*` route
+  re-checks the session itself.** Next 16 renamed `middleware`→`proxy`, and its
+  docs are explicit that proxy is for optimistic checks, "not a full session
+  management or authorization solution." Defence in depth, never the boundary.
 * Upstash rate limiting on login, comments, likes, subscribe and search — keyed
   on `x-vercel-forwarded-for`, never raw `x-forwarded-for` (which is
   attacker-controlled, so `xff.split(',')[0]` makes every limit bypassable with
@@ -193,12 +195,21 @@ premise. Full detail in [`PLAN.md`](PLAN.md) §10.
 
 ## 🚀 Getting started
 
-> Not yet applicable — Phase 0 has not been run. These are the intended steps.
-
 ```bash
 npm install
-cp .env.example .env.local     # then fill in the values below
+cp .env.example .env.local     # then fill in MONGODB_URI
 npm run dev
+```
+
+The app boots and serves pages with `MONGODB_URI` blank — only DB-backed routes
+fail, and they fail with a pointed message. Contrast `JWT_SECRET` (Phase 3),
+which fails at boot on purpose.
+
+```bash
+npm run typecheck    # tsc --noEmit
+npm run lint
+npm test             # vitest run
+npm run build
 ```
 
 ### Environment variables

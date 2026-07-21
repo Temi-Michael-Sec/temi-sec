@@ -541,7 +541,10 @@ page.
 - Short-lived access token with refresh
 - Generic failure message on login — no user enumeration
 - Constant-time comparison, so failures don't leak timing
-- All `/admin/*` gated in middleware, not just client-side
+- All `/admin/*` gated in `proxy.ts` (Next 16's renamed middleware) as an
+  *optimistic* check, **and** re-verified inside every `/api/admin/*` route.
+  Next's docs state proxy "should not be used as a full session management or
+  authorization solution" — defence in depth, never the boundary
 
 ### Rate limiting (Upstash)
 | Endpoint | Limit |

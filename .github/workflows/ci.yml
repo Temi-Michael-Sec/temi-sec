@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx eslint .
+
+      - name: Test
+        run: npx vitest run
+
+      # Tripwire for the bug class that produced this project's two worst
+      # spec defects — both lived at the seam where trusted HTML is injected.
+      # Any new raw-HTML sink must be added to the allowlist deliberately,
+      # in a PR where someone has to justify it.
+      - name: Guard raw HTML sinks
+        run: |
+          ALLOWED='src/components/post/PostBody.tsx|src/components/comments/CommentItem.tsx'
+          HITS=$(grep -rn "dangerouslySetInnerHTML" src/ 2>/dev/null \
+                 | grep -Ev "$ALLOWED" || true)
+          if [ -n "$HITS" ]; then
+            echo "::error::dangerouslySetInnerHTML outside the allowlist:"
+            echo "$HITS"
+            exit 1
+          fi
+          echo "No unallowlisted raw HTML sinks."
+
+      # NEXT_PUBLIC_* ships to the browser. A secret here is a public secret.
+      - name: Guard client-exposed secrets
+        run: |
+          HITS=$(grep -rnE "NEXT_PUBLIC_[A-Z_]*(SECRET|TOKEN|KEY|PASSWORD|PEPPER|URI)" \
+                 src/ *.ts 2>/dev/null || true)
+          if [ -n "$HITS" ]; then
+            echo "::error::Possible secret in a NEXT_PUBLIC_* variable:"
+            echo "$HITS"
+            exit 1
+          fi
+          echo "No secrets in NEXT_PUBLIC_* variables."
+
+      - name: Build
+        run: npx next build
+        env:
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000

@@ -2,7 +2,7 @@
 
 PR-sized build units with owners and merge gates.
 
-> **Current phase: not started.** Phase 0 is next.
+> **Phase 0 complete.** Phase 1 (content engine) is next.
 
 Related: [`README.md`](README.md) · [`structure.md`](structure.md) · [`PLAN.md`](PLAN.md)
 
@@ -47,7 +47,7 @@ to the PRs that implemented each control.
 
 | Phase | Scope | Status |
 |---|---|---|
-| 0 | Foundation, CI, static headers | ☐ Not started |
+| 0 | Foundation, CI, static headers | ✅ Done |
 | 1 | Content engine | ☐ |
 | 2 | Public reading experience → **DEPLOY** | ☐ |
 | 3 | Admin + editor + CTF guards | ☐ |
@@ -90,10 +90,38 @@ parallelize. Only P4.F (admin comment queue) reaches back into P3.
 > modules on every save; a fresh `mongoose.connect` per reload exhausts the
 > Atlas connection pool within minutes of normal dev.
 
-**Gate:** `npm run dev` serves a styled shell · `tsc --noEmit` clean ·
-`vitest run` executes · CI green on a PR · `curl -I` shows the static headers ·
-`/.well-known/security.txt` resolves · DB connection *defers* rather than
-crashing with `MONGODB_URI` blank.
+**Gate — met:** `tsc --noEmit` clean · `eslint` clean · `vitest run` green
+(3 tests) · `next build` succeeds · `curl -I` returns all five static headers ·
+`/.well-known/security.txt` resolves 200 · `connectDB()` defers rather than
+crashing with `MONGODB_URI` blank · theme toggle verified in both modes.
+
+### Landed in Phase 0
+
+| File | Note |
+|---|---|
+| `src/lib/db.ts` + `db.test.ts` | Cached connection; throws at call, not import |
+| `next.config.ts` | Five static security headers |
+| `public/.well-known/security.txt` | RFC 9116; `Canonical` pending a domain |
+| `vitest.config.ts` | `@/*` alias resolved |
+| `.github/workflows/ci.yml` | Typecheck, lint, test, two grep guards, build |
+| `.github/pull_request_template.md` | Includes a "tried to break it" section |
+| `src/components/layout/*` | Header, Footer, ThemeProvider, ThemeToggle |
+| `.env.example` | Every variable; `MONGODB_URI` blank |
+
+**Discovered during Phase 0 — carried into later phases:**
+
+- **`.gitignore` shipped `.env*` with no negation**, which silently ignored
+  `.env.example` too. Fixed with `!.env.example`; verified that `.env.local` and
+  `.env.production.local` are still ignored.
+- **Mobile nav is `hidden sm:flex` with nothing behind it.** Acceptable now (no
+  routes exist), but **Phase 2 needs a mobile menu** or the site is unnavigable
+  on a phone.
+- **`npm audit` reports a moderate `postcss` advisory** transitively via `next`.
+  `npm audit fix --force` would downgrade Next to 9.3.3 — do not run it. Re-check
+  in the Phase 8 dependency audit; it needs a Next release, not a local fix.
+- **The theme toggle renders both icons and lets CSS choose**, rather than
+  gating on a `mounted` state. Avoids hydration mismatch, the icon flash, and
+  the `react-hooks/set-state-in-effect` lint rule in one move.
 
 ---
 
@@ -185,7 +213,7 @@ and the post page verified on a real phone, not just devtools.
 | `models/User.ts` + admin seed (bcrypt 12) | `p3/user-model` | 🤖 |
 | `lib/auth/session.ts` — jose | `p3/session-jose` | 🤖 |
 | Auth attack suite | `p3/auth-tests` | 🧑 *(optional)* |
-| `middleware.ts` admin gate | `p3/middleware` | 🤖 |
+| `proxy.ts` admin gate (Next 16 name) | `p3/proxy` | 🤖 |
 | `lib/client-ip.ts` + `lib/ratelimit.ts` | `p3/ratelimit` | 🤖 |
 | `/admin/login` | `p3/login` | 🤖 |
 | Admin shell + dashboard | `p3/admin-shell` | 🧑 |
@@ -217,12 +245,18 @@ takedown risk, in your own subject area.
 > ⚠️ **`@upstash/ratelimit` fails open on a Redis outage.** Acceptable for
 > search; wrong for login, which must fail closed.
 
-> ⚠️ **Middleware is not the authorization boundary.** Every `/api/admin/*`
-> route checks the session itself. This is a Phase 3 invariant with a test, not
-> a Phase 8 audit item.
+> ⚠️ **`middleware.ts` is deprecated in Next 16 — the file is now `proxy.ts`**
+> and the exported function is `proxy`. Its runtime is `nodejs` and **cannot be
+> configured to edge**.
 
-> ⚠️ **`bcryptjs` does not run on the Edge runtime.** Password verification
-> lives in a Node route handler, never in middleware.
+> ⚠️ **Proxy is not the authorization boundary.** Next's own docs are explicit:
+> proxy "should not be used as a full session management or authorization
+> solution" — it is for *optimistic checks*. So every `/api/admin/*` route
+> verifies the session itself. Phase 3 invariant with a test, not a Phase 8
+> audit item.
+>
+> *(Because proxy now runs on Node, `bcryptjs` would technically work there.
+> Don't. The boundary argument above is unaffected by the runtime.)*
 
 **Gates:** `p3/session-jose` — app **refuses to boot** with `JWT_SECRET` unset;
 attack suite green (`alg:none`, stripped signature, replayed expiry, tampered
