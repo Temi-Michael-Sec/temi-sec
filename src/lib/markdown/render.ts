@@ -104,21 +104,63 @@ export async function renderMarkdown(markdown: string): Promise<string> {
 }
 
 /**
- * Strips Markdown to plain text — for excerpts, meta descriptions and search
- * indexing. Never rendered as HTML.
+ * Shared Markdown-to-text stripper for the two `markdownToPlainText` and
+ * `markdownToReadingText` exports below.
+ *
+ * The `keepCode` flag is the one real difference between them, and it is not a
+ * detail — it is a decision about what the caller wants:
+ *
+ *   - Excerpts, meta descriptions and search (keepCode: false) must NOT contain
+ *     code. `const x = 10;` in a Google snippet or a post preview is noise.
+ *   - Reading-time estimation (keepCode: true) SHOULD count code, because a
+ *     code-heavy CTF writeup genuinely takes time to work through, and dropping
+ *     it would report a ten-minute page as a two-minute one.
+ *
+ * Everything else — directives, links, headings, emphasis — is stripped
+ * identically. Structural strippers stay anchored to line starts (`^#{1,6}`,
+ * `^>`) so a `#` or `>` inside kept code is left alone.
  */
-export function markdownToPlainText(markdown: string): string {
-  return markdown
-    .replace(/```[\s\S]*?```/g, " ") // fenced code
-    .replace(/`[^`\n]*`/g, " ") // inline code
+function stripMarkdown(markdown: string, keepCode: boolean): string {
+  let text = markdown;
+
+  if (keepCode) {
+    // Drop the fence lines (language token and all) and inline backticks, but
+    // keep the code body so its words are counted.
+    text = text.replace(/```[^\n]*\n?/g, " ").replace(/`/g, " ");
+  } else {
+    // Drop code entirely.
+    text = text
+      .replace(/```[\s\S]*?```/g, " ") // fenced code
+      .replace(/`[^`\n]*`/g, " "); // inline code
+  }
+
+  return text
     .replace(/^:::.*$/gm, " ") // container directives
     .replace(/::\w+\[[^\]]*\]/g, " ") // leaf directives
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1") // images → alt text
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1") // links → label
     .replace(/^#{1,6}\s+/gm, "") // headings
     .replace(/^>\s?/gm, "") // blockquotes
-    .replace(/[*_~]{1,3}/g, "") // emphasis
     .replace(/\[\^[^\]]+\]/g, "") // footnote refs
+    .replace(/[*_~]{1,3}/g, "") // emphasis
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * Strips Markdown to plain text — for excerpts, meta descriptions and search
+ * indexing. Drops code. Never rendered as HTML.
+ */
+export function markdownToPlainText(markdown: string): string {
+  return stripMarkdown(markdown, false);
+}
+
+/**
+ * Strips Markdown to plain text for reading-time estimation. Unlike
+ * `markdownToPlainText`, this KEEPS code content so it counts toward the
+ * estimate. Word counting (including CJK segmentation) is the caller's job —
+ * see `lib/reading-time.ts`.
+ */
+export function markdownToReadingText(markdown: string): string {
+  return stripMarkdown(markdown, true);
 }

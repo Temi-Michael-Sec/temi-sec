@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { renderMarkdown, markdownToPlainText } from "./render";
+import {
+  renderMarkdown,
+  markdownToPlainText,
+  markdownToReadingText,
+} from "./render";
 import { FORBIDDEN_TAGS } from "./sanitize-schema";
 
 /**
@@ -244,5 +248,35 @@ describe("markdownToPlainText", () => {
 
   it("never returns markup", () => {
     expect(markdownToPlainText("# H\n\n`<script>`")).not.toContain("<");
+  });
+});
+
+describe("markdownToReadingText", () => {
+  it("keeps code content, unlike markdownToPlainText", () => {
+    // The contract that separates the two functions. reading-time counts code;
+    // meta descriptions and excerpts must not contain it.
+    const md = "text\n\n```bash\nnmap -sV target\n```\n\nmore";
+    const reading = markdownToReadingText(md);
+    expect(reading).toContain("nmap");
+    expect(reading).toContain("target");
+    // And the paired assertion: plain text still drops it.
+    expect(markdownToPlainText(md)).not.toContain("nmap");
+  });
+
+  it("strips the fence line including the language token", () => {
+    // Otherwise "typescript" would be counted as a word of prose.
+    expect(markdownToReadingText("```typescript\nconst x = 1\n```")).not.toContain(
+      "typescript",
+    );
+  });
+
+  it("keeps inline code content", () => {
+    expect(markdownToReadingText("run `nmap` now")).toBe("run nmap now");
+  });
+
+  it("still strips directives, headings and links", () => {
+    expect(
+      markdownToReadingText("## Title\n\n[docs](https://x.com)\n\n::youtube[abc]"),
+    ).toBe("Title docs");
   });
 });
