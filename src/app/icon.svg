@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="temi.sec">
+  <rect width="512" height="512" rx="96" fill="#18181b"/>
+  <path d="M140 158 L246 256 L140 354" fill="none" stroke="#2dd4bf" stroke-width="62" stroke-linecap="square" stroke-linejoin="miter"/>
+  <rect x="286" y="322" width="118" height="52" rx="6" fill="#2dd4bf"/>
+</svg>
