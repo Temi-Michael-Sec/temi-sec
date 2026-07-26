@@ -9,8 +9,6 @@ import mongoose from "mongoose";
  * `globalThis` — which survives hot reload, unlike module scope.
  */
 
-const MONGODB_URI = process.env.MONGODB_URI;
-
 interface MongooseCache {
   conn: typeof mongoose | null;
   promise: Promise<typeof mongoose> | null;
@@ -30,17 +28,22 @@ globalThis._mongooseCache = cached;
 export async function connectDB(): Promise<typeof mongoose> {
   if (cached.conn) return cached.conn;
 
-  // Deliberately thrown at call time, not at module load. The app must boot
-  // and serve static pages with MONGODB_URI unset — only DB-backed routes
-  // should fail. Contrast with JWT_SECRET, which fails at boot on purpose.
-  if (!MONGODB_URI) {
+  // Read at call time, not module load. Two reasons:
+  //   1. The app must boot and serve static pages with MONGODB_URI unset — only
+  //      DB-backed routes should fail. (Contrast JWT_SECRET, which fails at boot
+  //      on purpose.)
+  //   2. A module-load capture races env loaders. A script that calls
+  //      loadEnvConfig() at top level runs it AFTER its imports are evaluated,
+  //      so a captured value would be undefined. Reading here avoids that trap.
+  const uri = process.env.MONGODB_URI;
+  if (!uri) {
     throw new Error(
       "MONGODB_URI is not set. Add it to .env.local — see .env.example.",
     );
   }
 
   if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGODB_URI, {
+    cached.promise = mongoose.connect(uri, {
       bufferCommands: false,
     });
   }
@@ -58,5 +61,5 @@ export async function connectDB(): Promise<typeof mongoose> {
 }
 
 export function isDatabaseConfigured(): boolean {
-  return Boolean(MONGODB_URI);
+  return Boolean(process.env.MONGODB_URI);
 }
