@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ThemeToggle } from "./ThemeToggle";
+import { Logo } from "./Logo";
 
 // Routes are added as their phases land. See implementation.md.
 const NAV = [
@@ -14,11 +15,8 @@ export function Header() {
   return (
     <header className="border-b border-border">
       <div className="mx-auto flex h-16 max-w-5xl items-center gap-6 px-5">
-        <Link
-          href="/"
-          className="font-mono text-sm font-semibold tracking-tight"
-        >
-          <span className="text-accent">$</span> temi.sec
+        <Link href="/" aria-label="temi.sec home">
+          <Logo />
         </Link>
 
         <nav aria-label="Main" className="hidden gap-5 text-sm sm:flex">
