@@ -15,7 +15,7 @@ const STATIC_PATHS = [
   "/notes",
   "/glossary",
   "/about",
-  "/security",
+  // "/security" is added in Phase 8 when the page exists.
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
