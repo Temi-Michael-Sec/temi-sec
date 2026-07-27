@@ -55,7 +55,7 @@ jobs:
           fi
           echo "No secrets in NEXT_PUBLIC_* variables."
 
-      - name: Build
-        run: npx next build
-        env:
-          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      # No `next build` here: the build statically generates post pages, which
+      # queries MongoDB, and CI has no MONGODB_URI. Build validation happens on
+      # Vercel's preview deploy instead (it has the env), which is the plan's
+      # "preview deploy builds" merge gate. CI stays fast and DB-free.

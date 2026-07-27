@@ -1,14 +1,13 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getBySlug, getAllPublished, getWriteupsUsingTool } from "@/lib/posts";
+import { getBySlug, staticSlugsForType, getWriteupsUsingTool } from "@/lib/posts";
 import { buildPostMetadata } from "@/lib/seo";
 import { ToolPage } from "@/components/post/ToolPage";
 
 export const revalidate = 300;
 
-export async function generateStaticParams() {
-  const all = await getAllPublished();
-  return all.filter((p) => p.type === "tool").map((p) => ({ slug: p.slug }));
+export function generateStaticParams() {
+  return staticSlugsForType("tool");
 }
 
 export async function generateMetadata({

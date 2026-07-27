@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getBySlug, getAllPublished } from "@/lib/posts";
+import { getBySlug, staticSlugsForType } from "@/lib/posts";
 import { buildPostMetadata } from "@/lib/seo";
 import { PostShell } from "@/components/post/PostShell";
 import { ArticleHeader } from "@/components/post/headers";
@@ -9,9 +9,8 @@ import { ArticleHeader } from "@/components/post/headers";
 // on-demand revalidation for instant updates.
 export const revalidate = 300;
 
-export async function generateStaticParams() {
-  const all = await getAllPublished();
-  return all.filter((p) => p.type === "article").map((p) => ({ slug: p.slug }));
+export function generateStaticParams() {
+  return staticSlugsForType("article");
 }
 
 export async function generateMetadata({

@@ -201,6 +201,22 @@ export async function getAllPublished(): Promise<
   }));
 }
 
+/**
+ * Slugs of one type, for a page's `generateStaticParams`. Resilient: if the DB
+ * is unreachable at build time, it returns [] and the pages fall back to
+ * on-demand rendering (dynamicParams) rather than failing the whole build.
+ */
+export async function staticSlugsForType(
+  type: ContentType,
+): Promise<{ slug: string }[]> {
+  try {
+    const all = await getAllPublished();
+    return all.filter((p) => p.type === type).map((p) => ({ slug: p.slug }));
+  } catch {
+    return [];
+  }
+}
+
 /** Published posts carrying a given tag, newest first. */
 export async function getByTag(tag: string): Promise<PostListItem[]> {
   await connectDB();

@@ -1,15 +1,14 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getBySlug, getAllPublished } from "@/lib/posts";
+import { getBySlug, staticSlugsForType } from "@/lib/posts";
 import { buildPostMetadata } from "@/lib/seo";
 import { PostShell } from "@/components/post/PostShell";
 import { CtfHeader } from "@/components/post/headers";
 
 export const revalidate = 300;
 
-export async function generateStaticParams() {
-  const all = await getAllPublished();
-  return all.filter((p) => p.type === "ctf").map((p) => ({ slug: p.slug }));
+export function generateStaticParams() {
+  return staticSlugsForType("ctf");
 }
 
 export async function generateMetadata({

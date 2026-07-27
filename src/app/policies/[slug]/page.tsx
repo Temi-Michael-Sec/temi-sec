@@ -1,14 +1,13 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getBySlug, getAllPublished } from "@/lib/posts";
+import { getBySlug, staticSlugsForType } from "@/lib/posts";
 import { buildPostMetadata } from "@/lib/seo";
 import { PolicyPage } from "@/components/post/PolicyPage";
 
 export const revalidate = 300;
 
-export async function generateStaticParams() {
-  const all = await getAllPublished();
-  return all.filter((p) => p.type === "policy").map((p) => ({ slug: p.slug }));
+export function generateStaticParams() {
+  return staticSlugsForType("policy");
 }
 
 export async function generateMetadata({
