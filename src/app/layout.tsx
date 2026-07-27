@@ -21,11 +21,15 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Temi Michael — Security Notes",
-    template: "%s · Temi Michael",
+    default: "temi.sec — Security Notes",
+    template: "%s · temi.sec",
   },
   description:
-    "Cybersecurity writing: CTF writeups, tool references, security policy templates, and learning paths.",
+    "Security notes, CTF writeups, and a tool reference that gets used.",
+  // RSS autodiscovery — pasting the homepage URL into a reader finds the feed.
+  alternates: {
+    types: { "application/rss+xml": `${siteUrl}/rss.xml` },
+  },
 };
 
 export default function RootLayout({
