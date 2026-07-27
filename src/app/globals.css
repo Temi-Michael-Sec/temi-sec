@@ -1,39 +1,75 @@
 @import "tailwindcss";
 
-/* next-themes sets class="dark" on <html>, so dark: variants key off that
-   rather than the OS media query. */
+/* next-themes sets class="dark" on <html>, so dark: variants and the .dark
+   token overrides below key off that class rather than the OS media query. */
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --background: #ffffff;
   --foreground: #18181b;
   --muted: #52525b;
+  --faint: #71717a;
   --border: #e4e4e7;
-  --accent: #0d9488;
   --surface: #fafafa;
+  --surface-2: #f4f4f5;
+  --accent: #0d9488;
 
-  /* Long-form reading is the primary use of this site, so the measure is set
-     once, here, rather than per-page. ~70 characters is the readable range;
-     much wider and the eye loses its place returning to the next line. */
+  /* semantic — meaning, kept separate from the brand accent */
+  --ok: #15803d;
+  --warn: #b45309;
+  --crit: #b91c1c;
+  --info: #1d4ed8;
+
+  /* per content type — muted so the teal accent stays the hero */
+  --t-article: #0d9488;
+  --t-ctf: #be123c;
+  --t-tool: #1d4ed8;
+  --t-policy: #b45309;
+  --t-note: #7c3aed;
+  --t-glossary: #0e7490;
+
+  /* Long-form reading is the primary use, so the measure is set once here.
+     ~68 characters is the readable range; wider and the eye loses the return. */
   --measure: 68ch;
+  --radius: 6px;
 }
 
 .dark {
   --background: #0a0a0b;
   --foreground: #e4e4e7;
   --muted: #a1a1aa;
+  --faint: #8b8b93;
   --border: #27272a;
-  --accent: #2dd4bf;
   --surface: #151517;
+  --surface-2: #1c1c20;
+  --accent: #2dd4bf;
+
+  --ok: #4ade80;
+  --warn: #fbbf24;
+  --crit: #f87171;
+  --info: #60a5fa;
+
+  --t-article: #2dd4bf;
+  --t-ctf: #fb7185;
+  --t-tool: #60a5fa;
+  --t-policy: #fbbf24;
+  --t-note: #a78bfa;
+  --t-glossary: #22d3ee;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
+  --color-faint: var(--faint);
   --color-border: var(--border);
-  --color-accent: var(--accent);
   --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-accent: var(--accent);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-crit: var(--crit);
+  --color-info: var(--info);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -42,12 +78,10 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
-  /* Slightly open leading — security writing is dense and code-adjacent. */
   line-height: 1.7;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Respect users who ask for reduced motion. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -59,9 +93,321 @@ body {
   }
 }
 
-/* Visible focus for keyboard users. The default ring is easy to lose against
-   a dark background. */
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Reading measure helper. */
+.measure {
+  max-width: var(--measure);
+}
+
+/* ─── Shiki dual-theme ────────────────────────────────────────────────────────
+   Shiki (defaultColor: false) writes both palettes as CSS variables on each
+   token. These rules select the right one per theme — without them, code has no
+   colour. Keep it in sync with the SHIKI_THEMES in lib/markdown/render.ts. */
+.post-body .shiki,
+.post-body .shiki span {
+  color: var(--shiki-light);
+  background-color: var(--shiki-light-bg);
+}
+.dark .post-body .shiki,
+.dark .post-body .shiki span {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg);
+}
+
+/* ═══ Rendered post content ═══════════════════════════════════════════════════
+   Styles the stored, sanitized bodyHtml. Everything here targets the output of
+   the markdown pipeline (headings with anchors, Shiki code, directive data-
+   attributes), never hand-authored markup. */
+
+.post-body {
+  font-size: 1.02rem;
+}
+.post-body > * + * {
+  margin-top: 1rem;
+}
+.post-body h2,
+.post-body h3,
+.post-body h4 {
+  scroll-margin-top: 5rem;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+.post-body h2 {
+  font-size: 1.5rem;
+  margin-top: 2.5rem;
+}
+.post-body h3 {
+  font-size: 1.2rem;
+  margin-top: 1.75rem;
+}
+.post-body h4 {
+  font-size: 1.05rem;
+  margin-top: 1.4rem;
+}
+
+/* heading anchor link appended by rehype-autolink-headings */
+.post-body .heading-anchor {
+  margin-left: 0.4rem;
+  color: var(--faint);
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.post-body .heading-anchor::before {
+  content: "#";
+}
+.post-body h2:hover .heading-anchor,
+.post-body h3:hover .heading-anchor,
+.post-body h4:hover .heading-anchor,
+.post-body .heading-anchor:focus-visible {
+  opacity: 1;
+}
+
+.post-body a:not(.heading-anchor) {
+  color: var(--accent);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.post-body ul,
+.post-body ol {
+  padding-left: 1.3rem;
+}
+.post-body li + li {
+  margin-top: 0.35rem;
+}
+.post-body blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 1rem;
+  color: var(--muted);
+}
+.post-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+/* inline code */
+.post-body :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--surface-2);
+  padding: 0.12em 0.4em;
+  border-radius: 4px;
+}
+
+/* code blocks (Shiki) — terminal-styled shell */
+.post-body pre.shiki {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  position: relative;
+}
+.post-body pre.shiki code {
+  font-family: var(--font-mono);
+}
+
+/* copy button injected by PostBody enhancer */
+.post-body .code-copy {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.post-body pre.shiki:hover .code-copy,
+.post-body .code-copy:focus-visible {
+  opacity: 1;
+}
+.post-body .code-copy:hover {
+  color: var(--foreground);
+  border-color: var(--accent);
+}
+
+/* callouts — [data-callout=note|tip|warning|danger] */
+.post-body [data-callout] {
+  --co: var(--info);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--co);
+  border-radius: var(--radius);
+  background: color-mix(in oklab, var(--co) 7%, var(--background));
+  padding: 0.85rem 1rem;
+}
+.post-body [data-callout] > :first-child {
+  margin-top: 0;
+}
+.post-body [data-callout="note"] {
+  --co: var(--muted);
+}
+.post-body [data-callout="tip"] {
+  --co: var(--ok);
+}
+.post-body [data-callout="warning"] {
+  --co: var(--warn);
+}
+.post-body [data-callout="danger"] {
+  --co: var(--crit);
+}
+.post-body [data-callout]::before {
+  content: attr(data-callout);
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--co);
+  margin-bottom: 0.3rem;
+}
+
+/* spoilers — enhanced into <details> by PostBody; styles cover both states */
+.post-body details.spoiler {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.post-body details.spoiler > summary {
+  cursor: pointer;
+  padding: 0.7rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--accent);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.post-body details.spoiler > summary::-webkit-details-marker {
+  display: none;
+}
+.post-body details.spoiler > summary::before {
+  content: "▶";
+  font-size: 0.6rem;
+  transition: transform 0.15s;
+}
+.post-body details.spoiler[open] > summary::before {
+  transform: rotate(90deg);
+}
+.post-body details.spoiler > .spoiler-body {
+  padding: 0 1rem 0.85rem;
+  border-top: 1px solid var(--border);
+}
+.post-body details.spoiler > .spoiler-body > :first-child {
+  margin-top: 0.85rem;
+}
+
+/* redacted flags — [data-flag] */
+.post-body [data-flag] {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  vertical-align: middle;
+}
+.post-body [data-flag]::before {
+  content: attr(data-flag) ".txt";
+  color: var(--muted);
+}
+.post-body [data-flag]::after {
+  content: "redacted";
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+  color: var(--faint);
+  background: repeating-linear-gradient(
+    45deg,
+    var(--surface-2),
+    var(--surface-2) 4px,
+    var(--border) 4px,
+    var(--border) 8px
+  );
+  border-radius: 3px;
+  padding: 0.1rem 0.75rem;
+}
+
+/* malformed-directive marker */
+.post-body [data-directive-error] {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--crit);
+  border: 1px dashed var(--crit);
+  border-radius: 4px;
+  padding: 0.4rem 0.6rem;
+}
+
+/* youtube facade injected by PostBody */
+.post-body .yt-embed {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.post-body .yt-embed iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.post-body .yt-facade {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  background: var(--surface);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+.post-body .yt-facade:hover {
+  color: var(--accent);
+}
+
+/* tables */
+.post-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+  display: block;
+  overflow-x: auto;
+}
+.post-body th,
+.post-body td {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+.post-body th {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--faint);
+  font-weight: 500;
+}
+
+/* footnotes (remark-gfm) */
+.post-body .footnotes {
+  margin-top: 2.5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+  font-size: 0.9rem;
+  color: var(--muted);
 }
