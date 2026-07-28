@@ -16,7 +16,7 @@ export function Header() {
   return (
     <header className="relative border-b border-border">
       <div className="mx-auto flex h-16 max-w-5xl items-center gap-6 px-5">
-        <Link href="/" aria-label="temi.sec home">
+        <Link href="/" aria-label="temi.sec home" className="flex items-center">
           <Logo />
         </Link>
 
