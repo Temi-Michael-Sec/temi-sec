@@ -6,6 +6,7 @@ import { PostBody } from "./PostBody";
 import { StaleBanner } from "./StaleBanner";
 import { InstallTabs } from "./InstallTabs";
 import { TypeBadge, Badge } from "@/components/ui/Badge";
+import { externalLink } from "@/lib/format";
 import { labelOf, TOOL_CATEGORIES } from "@/lib/taxonomy";
 
 /**
@@ -20,6 +21,7 @@ export function ToolPage({
   post: PostDetail;
   writeups: PostListItem[];
 }) {
+  const official = externalLink(post.officialUrl);
   return (
     <div className="mx-auto max-w-5xl px-5">
       <header className="border-b border-border pb-6 pt-12">
@@ -32,15 +34,15 @@ export function ToolPage({
           {post.toolCategory && (
             <Badge>{labelOf(TOOL_CATEGORIES, post.toolCategory)}</Badge>
           )}
-          {post.officialUrl && (
+          {official && (
             <a
-              href={post.officialUrl}
+              href={official.href}
               target="_blank"
               rel="noopener noreferrer"
               className="rounded border border-accent/40 px-2 py-[0.15rem] font-mono text-[0.7rem] text-accent"
               style={{ borderColor: "color-mix(in oklab, var(--accent) 40%, var(--border))" }}
             >
-              {new URL(post.officialUrl).host} ↗
+              {official.host} ↗
             </a>
           )}
           {post.platforms && post.platforms.length > 0 && (

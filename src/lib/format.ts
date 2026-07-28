@@ -37,3 +37,29 @@ export function readingLabel(minutes: number | undefined): string {
   const m = Math.max(1, minutes ?? 1);
   return `${m} min read`;
 }
+
+/**
+ * Safely resolves a user-entered external URL to a `{ href, host }` pair, or
+ * null if it isn't a usable http(s) URL.
+ *
+ * `new URL()` throws on a bare host like "nmap.org", which would 500 a page
+ * that renders it. This tolerates a missing scheme (tries https://), and
+ * rejects anything that isn't http/https — so a `javascript:` or `data:` value
+ * can never become a link.
+ */
+export function externalLink(
+  url: string | undefined | null,
+): { href: string; host: string } | null {
+  if (!url) return null;
+  for (const candidate of [url, `https://${url}`]) {
+    try {
+      const u = new URL(candidate);
+      if (u.protocol === "http:" || u.protocol === "https:") {
+        return { href: u.href, host: u.host };
+      }
+    } catch {
+      // try the next candidate
+    }
+  }
+  return null;
+}

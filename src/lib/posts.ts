@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { connectDB } from "@/lib/db";
 import { Post } from "@/models/Post";
 import type {
@@ -179,12 +180,19 @@ export async function getTypeCounts(): Promise<Record<string, number>> {
   return Object.fromEntries(rows.map((r) => [r._id, r.n]));
 }
 
-/** A single published post by slug (any type), or null. */
-export async function getBySlug(slug: string): Promise<PostDetail | null> {
-  await connectDB();
-  const doc = await Post.findOne({ ...PUBLISHED, slug }).lean();
-  return doc ? toDetail(doc) : null;
-}
+/**
+ * A single published post by slug (any type), or null.
+ *
+ * Wrapped in React `cache()` so the two calls in a post request —
+ * `generateMetadata` and the page body — share one DB query instead of two.
+ */
+export const getBySlug = cache(
+  async (slug: string): Promise<PostDetail | null> => {
+    await connectDB();
+    const doc = await Post.findOne({ ...PUBLISHED, slug }).lean();
+    return doc ? toDetail(doc) : null;
+  },
+);
 
 /** Every published (type, slug) pair — for generateStaticParams and sitemap. */
 export async function getAllPublished(): Promise<
