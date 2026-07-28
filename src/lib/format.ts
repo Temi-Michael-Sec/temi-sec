@@ -51,15 +51,17 @@ export function externalLink(
   url: string | undefined | null,
 ): { href: string; host: string } | null {
   if (!url) return null;
-  for (const candidate of [url, `https://${url}`]) {
-    try {
-      const u = new URL(candidate);
-      if (u.protocol === "http:" || u.protocol === "https:") {
-        return { href: u.href, host: u.host };
-      }
-    } catch {
-      // try the next candidate
+  // Only assume https:// when there is no scheme at all. Prepending it to an
+  // input that already has one (e.g. "ftp://x") would mangle it into a bogus
+  // "https://ftp://x" with host "ftp".
+  const candidate = url.includes("://") ? url : `https://${url}`;
+  try {
+    const u = new URL(candidate);
+    if (u.protocol === "http:" || u.protocol === "https:") {
+      return { href: u.href, host: u.host };
     }
+  } catch {
+    // not a usable URL
   }
   return null;
 }

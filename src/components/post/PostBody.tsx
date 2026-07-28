@@ -58,7 +58,9 @@ function addCopyButtons(root: HTMLElement) {
     btn.textContent = "copy";
     btn.setAttribute("aria-label", "Copy code");
     btn.addEventListener("click", () => {
-      const code = pre.querySelector("code")?.innerText ?? "";
+      // textContent, not innerText: we want the raw code, not layout-filtered
+      // text, and it works consistently across environments.
+      const code = pre.querySelector("code")?.textContent ?? "";
       navigator.clipboard?.writeText(code);
       btn.textContent = "copied";
       window.setTimeout(() => (btn.textContent = "copy"), 1200);
