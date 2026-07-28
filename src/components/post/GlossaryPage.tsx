@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { PostDetail } from "@/lib/posts";
+import { type PostDetail, existingSlugs } from "@/lib/posts";
 import { Prompt } from "./Prompt";
 import { PostBody } from "./PostBody";
 
@@ -7,8 +7,15 @@ import { PostBody } from "./PostBody";
  * Glossary term page — a dictionary/wiki entry. The one-line definition
  * (shortDef, plain text by contract) sits up top, then the fuller explanation,
  * then cross-links to related terms.
+ *
+ * Async: it filters `seeAlso` down to terms that actually exist, so a related
+ * term we haven't written yet doesn't render a 404 link.
  */
-export function GlossaryPage({ post }: { post: PostDetail }) {
+export async function GlossaryPage({ post }: { post: PostDetail }) {
+  const seeAlso = post.seeAlso ?? [];
+  const existing = await existingSlugs(seeAlso);
+  const validSeeAlso = seeAlso.filter((slug) => existing.has(slug));
+
   return (
     <div className="mx-auto max-w-3xl px-5">
       <header className="border-b border-border pb-6 pt-12">
@@ -31,13 +38,13 @@ export function GlossaryPage({ post }: { post: PostDetail }) {
       <div className="measure py-8">
         {post.bodyHtml && <PostBody html={post.bodyHtml} />}
 
-        {post.seeAlso && post.seeAlso.length > 0 && (
+        {validSeeAlso.length > 0 && (
           <section className="mt-8 border-t border-border pt-5">
             <p className="mb-2 font-mono text-[0.72rem] uppercase tracking-[0.08em] text-faint">
               See also
             </p>
             <div className="flex flex-wrap gap-2">
-              {post.seeAlso.map((slug) => (
+              {validSeeAlso.map((slug) => (
                 <Link
                   key={slug}
                   href={`/glossary/${slug}`}

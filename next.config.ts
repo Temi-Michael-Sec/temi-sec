@@ -32,6 +32,8 @@ const contentSecurityPolicyReportOnly = [
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
+  // Send violations to our sink so report-only actually collects data.
+  "report-uri /api/csp-report",
 ].join("; ");
 const securityHeaders = [
   // Stop browsers guessing content types. Mitigates a whole class of upload

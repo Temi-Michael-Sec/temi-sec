@@ -4,22 +4,21 @@ A publishing platform for cybersecurity writing — articles, CTF writeups, a
 searchable tool reference, security policy templates, and structured learning
 paths. Built to be **used during real work**, not just read once.
 
-> **Status: Phase 0 complete.** Foundation, CI and static security headers are
-> in. The content engine is next. See [`implementation.md`](implementation.md)
-> for progress and [`PLAN.md`](PLAN.md) for the reasoning.
+> **Status: live.** Phases 0–2 complete — the public reading experience is
+> deployed at **[temi-sec.vercel.app](https://temi-sec.vercel.app)**. Next up:
+> the admin editor and publish flow (Phase 3).
 
----
+**Built so far**
 
-## 📁 Source of truth
-
-| File | Purpose |
-|---|---|
-| [`README.md`](README.md) | What this is, features, setup, env vars |
-| [`structure.md`](structure.md) | Folder layout + full data model reference |
-| [`implementation.md`](implementation.md) | Phased build steps and progress |
-| [`PLAN.md`](PLAN.md) | Design decisions and the reasoning behind them |
-
-`PLAN.md` explains *why*. The other three explain *what* and *how*.
+- Six content types (article · CTF writeup · tool · policy · note · glossary),
+  each with its own reading layout — a CTF shows a metadata infobox, a tool
+  reads like a man page with a cheatsheet, a policy is a document with downloads.
+- A sanitised Markdown pipeline (remark/rehype + Shiki) with custom directives
+  for callouts, spoilers, redacted flags and privacy-friendly video.
+- Composed home, per-type listings, glossary A–Z, tag pages, an RSS feed,
+  sitemap, robots, per-page SEO/OG, a terminal-themed 404, and light/dark.
+- ~285 tests across the content engine and presentation layer; CI runs
+  typecheck, lint, tests and two security grep-guards on every push.
 
 ---
 

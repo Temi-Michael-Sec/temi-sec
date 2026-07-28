@@ -150,10 +150,17 @@ export async function getLatest(
   return docs.map(toListItem);
 }
 
-/** Published posts of a single type, newest first, with pagination. */
+/**
+ * Published posts of a single type, newest first.
+ *
+ * The default limit is generous on purpose: real pagination lands in Phase 5
+ * with the faceted, path-based listing URLs (so it stays static and indexable).
+ * Until then a high cap avoids *silently* truncating a listing — the failure
+ * mode being fixed here.
+ */
 export async function getByType(
   type: ContentType,
-  { limit = 20, skip = 0 }: { limit?: number; skip?: number } = {},
+  { limit = 60, skip = 0 }: { limit?: number; skip?: number } = {},
 ): Promise<PostListItem[]> {
   await connectDB();
   const docs = await Post.find({ ...PUBLISHED, type })
@@ -233,6 +240,19 @@ export async function getByTag(tag: string): Promise<PostListItem[]> {
     .sort({ publishedAt: -1 })
     .lean();
   return docs.map(toListItem);
+}
+
+/**
+ * Of the given slugs, which are actually published — so cross-links (glossary
+ * "see also", etc.) only point at content that exists, never a 404.
+ */
+export async function existingSlugs(slugs: string[]): Promise<Set<string>> {
+  if (slugs.length === 0) return new Set();
+  await connectDB();
+  const docs = await Post.find({ ...PUBLISHED, slug: { $in: slugs } })
+    .select("slug")
+    .lean();
+  return new Set(docs.map((d) => d.slug));
 }
 
 /** CTF writeups that reference a given tool slug — for tool cross-links. */
