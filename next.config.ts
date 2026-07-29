@@ -59,14 +59,23 @@ const securityHeaders = [
     key: "Strict-Transport-Security",
     value: "max-age=63072000; includeSubDomains",
   },
+];
 
-  // Report-only: evaluated by the browser, but nothing is blocked. Phase 8
-  // flips this to an enforcing `Content-Security-Policy`.
-  {
+/**
+ * Report-only CSP — PRODUCTION ONLY, on purpose.
+ *
+ * In dev, Next/Turbopack use `eval()` for Fast Refresh and RSC, which trips
+ * `script-src` on every reload and floods /api/csp-report with noise that tells
+ * us nothing about the real deployed policy. Scoping the header to production
+ * both quiets the dev console and makes the reports we DO collect meaningful —
+ * they are the signal Phase 8 uses before flipping this to an enforcing CSP.
+ */
+if (process.env.NODE_ENV === "production") {
+  securityHeaders.push({
     key: "Content-Security-Policy-Report-Only",
     value: contentSecurityPolicyReportOnly,
-  },
-];
+  });
+}
 
 const nextConfig: NextConfig = {
   async headers() {

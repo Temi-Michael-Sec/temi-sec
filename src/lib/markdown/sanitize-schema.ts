@@ -138,6 +138,31 @@ export const postSanitizeSchema: SanitizeOptions = {
 };
 
 /**
+ * Stricter allowlist for content NOT authored by the single admin.
+ *
+ * Identical to {@link postSanitizeSchema} in every allowlist decision — same
+ * tags, same attributes, same protocols — but it drops the two DOM-clobbering
+ * concessions above, restoring `rehype-sanitize`'s default `user-content-`
+ * prefix on `id`/`name`. That prefix is exactly what the ⚠ note on
+ * `postSanitizeSchema` says to bring back "the moment post bodies stop being
+ * single-author."
+ *
+ * Nothing calls this yet. It is the sanitize half of the `renderMarkdown(md,
+ * { trusted })` seam (see render.ts): guest submissions (a future phase) render
+ * with `trusted: false` and land here, while admin content keeps the prefix-free
+ * schema. Wiring it now means that phase flips one boolean instead of reworking
+ * the pipeline.
+ */
+export const guestSanitizeSchema: SanitizeOptions = (() => {
+  // Omit `clobber`/`clobberPrefix` so rehype-sanitize applies its secure
+  // defaults rather than the admin overrides.
+  const { clobber, clobberPrefix, ...rest } = postSanitizeSchema;
+  void clobber;
+  void clobberPrefix;
+  return rest;
+})();
+
+/**
  * Elements that must never appear in stored post HTML, whatever the schema
  * says. Asserted directly by the render tests so a future edit to the
  * allowlist cannot quietly reintroduce one.

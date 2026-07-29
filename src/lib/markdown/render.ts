@@ -11,7 +11,9 @@ import rehypeSanitize from "rehype-sanitize";
 import rehypeShiki from "@shikijs/rehype";
 import rehypeStringify from "rehype-stringify";
 
-import { postSanitizeSchema } from "./sanitize-schema";
+import type { Options as SanitizeOptions } from "rehype-sanitize";
+
+import { postSanitizeSchema, guestSanitizeSchema } from "./sanitize-schema";
 import { remarkCustomDirectives } from "./directives";
 
 /**
@@ -74,31 +76,61 @@ const autolinkOptions: AutolinkOptions = {
   },
 };
 
-const processor = unified()
-  .use(remarkParse)
-  .use(remarkGfm) // tables, strikethrough, task lists, [^1] footnotes
-  .use(remarkDirective) // ::: syntax — must precede our handler
-  .use(remarkCustomDirectives) // callout / spoiler / flag / youtube
-  .use(remarkRehype, { allowDangerousHtml: false })
-  .use(rehypeSlug) // heading IDs — must precede TOC extraction
-  .use(rehypeAutolinkHeadings, autolinkOptions)
-  .use(rehypeSanitize, postSanitizeSchema) // ← everything above is untrusted
-  .use(rehypeShiki, {
-    themes: SHIKI_THEMES,
-    defaultColor: false,
-    // A fenced block with an unknown or absent language must still render as
-    // a code block rather than throwing mid-publish.
-    fallbackLanguage: "text",
-  })
-  .use(rehypeStringify);
+/**
+ * The chain is identical for every caller except the sanitize schema, which is
+ * the one thing that varies between trusted (admin) and untrusted (guest)
+ * content. Everything above the sanitize step is untrusted input regardless.
+ */
+function buildProcessor(sanitizeSchema: SanitizeOptions) {
+  return unified()
+    .use(remarkParse)
+    .use(remarkGfm) // tables, strikethrough, task lists, [^1] footnotes
+    .use(remarkDirective) // ::: syntax — must precede our handler
+    .use(remarkCustomDirectives) // callout / spoiler / flag / youtube
+    .use(remarkRehype, { allowDangerousHtml: false })
+    .use(rehypeSlug) // heading IDs — must precede TOC extraction
+    .use(rehypeAutolinkHeadings, autolinkOptions)
+    .use(rehypeSanitize, sanitizeSchema) // ← everything above is untrusted
+    .use(rehypeShiki, {
+      themes: SHIKI_THEMES,
+      defaultColor: false,
+      // A fenced block with an unknown or absent language must still render as
+      // a code block rather than throwing mid-publish.
+      fallbackLanguage: "text",
+    })
+    .use(rehypeStringify);
+}
+
+// Built once per schema and reused — Shiki loads grammars on demand, so a fresh
+// processor per call would re-pay that cost. The guest processor is lazy: it
+// stays unbuilt until the first untrusted render (a future phase), so nothing
+// changes for today's single-admin site.
+const trustedProcessor = buildProcessor(postSanitizeSchema);
+let guestProcessor: ReturnType<typeof buildProcessor> | null = null;
+
+export interface RenderOptions {
+  /**
+   * Whether the Markdown was authored by the trusted admin. `true` (default)
+   * uses the prefix-free {@link postSanitizeSchema}. `false` is the seam for
+   * guest submissions — it uses the stricter {@link guestSanitizeSchema}, which
+   * restores DOM-clobbering protection. See sanitize-schema.ts.
+   */
+  trusted?: boolean;
+}
 
 /**
  * Renders Markdown to sanitized HTML.
  *
  * Async because Shiki loads grammars on demand.
  */
-export async function renderMarkdown(markdown: string): Promise<string> {
+export async function renderMarkdown(
+  markdown: string,
+  { trusted = true }: RenderOptions = {},
+): Promise<string> {
   if (!markdown.trim()) return "";
+  const processor = trusted
+    ? trustedProcessor
+    : (guestProcessor ??= buildProcessor(guestSanitizeSchema));
   const file = await processor.process(markdown);
   return String(file);
 }

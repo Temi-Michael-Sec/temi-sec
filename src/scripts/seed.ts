@@ -29,10 +29,7 @@ import mongoose from "mongoose";
 loadEnvConfig(process.cwd());
 
 import { connectDB } from "../lib/db";
-import { renderMarkdown } from "../lib/markdown/render";
-import { extractToc } from "../lib/markdown/toc";
-import { readingTime } from "../lib/reading-time";
-import { extractSearchTokens } from "../lib/search/tokens";
+import { deriveContent } from "../lib/publish/derive";
 import { seeds } from "./seed-data";
 
 async function seed() {
@@ -50,20 +47,15 @@ async function seed() {
   const rows: { type: string; slug: string; minutes: number; toc: number }[] = [];
 
   for (const entry of seeds) {
-    const bodyHtml = await renderMarkdown(entry.body);
-    const toc = extractToc(entry.body);
-    const searchTokens = entry.tokenSource
-      ? extractSearchTokens(entry.tokenSource)
-      : [];
+    // The exact derivation the admin publish flow uses — one implementation, so
+    // a re-seed can never disagree with what the editor would have produced.
+    const derived = await deriveContent(entry.body, entry.tokenSource);
 
     const update = {
       ...entry.doc,
       body: entry.body,
       excerpt: entry.excerpt,
-      bodyHtml,
-      toc,
-      readingTime: readingTime(entry.body),
-      searchTokens,
+      ...derived,
       status: "published",
       publishedAt: now,
       lastReviewedAt: now,

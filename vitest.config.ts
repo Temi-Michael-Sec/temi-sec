@@ -5,6 +5,11 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      // `server-only`'s real module throws outside an RSC bundle (i.e. in these
+      // node tests). Stub it so server-only modules stay importable in tests.
+      "server-only": fileURLToPath(
+        new URL("./src/test-utils/empty.ts", import.meta.url),
+      ),
     },
   },
   test: {
