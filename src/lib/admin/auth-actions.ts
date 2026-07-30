@@ -32,12 +32,18 @@ export interface LoginState {
 }
 
 function clientIp(headerList: Headers): string {
-  // x-forwarded-for is a comma-separated list; the client is the first entry.
-  return (
-    headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    headerList.get("x-real-ip") ||
-    "unknown"
-  );
+  // Prefer x-real-ip: on Vercel the platform sets it to the connecting client,
+  // so unlike the LEFTMOST x-forwarded-for value it is not client-controllable
+  // (a spoofed leftmost XFF could otherwise be rotated to evade the throttle).
+  // Fall back to the LAST x-forwarded-for hop — the one the trusted proxy
+  // appended — then to a constant so unknowns share one bucket.
+  const realIp = headerList.get("x-real-ip")?.trim();
+  if (realIp) return realIp;
+  const parts = (headerList.get("x-forwarded-for") ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return parts.at(-1) ?? "unknown";
 }
 
 export async function login(

@@ -14,6 +14,7 @@ import {
 } from "@/models/Post";
 import type { ContentType } from "@/lib/taxonomy";
 import type { TokenSource } from "@/lib/search/tokens";
+import { toDetail as toPublicDetail, type PostDetail } from "@/lib/posts";
 import { slugify } from "@/lib/slug";
 import { deriveContent } from "@/lib/publish/derive";
 import { evaluatePublishGuards, type GuardResult } from "@/lib/publish/ctf-guards";
@@ -136,6 +137,32 @@ export async function getForEdit(id: string): Promise<AdminPostDetail | null> {
   await connectDB();
   const doc = await Post.findById(id).lean();
   return doc ? toDetail(doc) : null;
+}
+
+/**
+ * A single post of ANY status as a public-shaped `PostDetail`, for the admin
+ * draft preview — so the preview renders through the exact same components the
+ * live pages use. Draft-reading is confined here (behind requireAdmin); the
+ * public layer in posts.ts stays published-only.
+ */
+export async function getForPreview(
+  id: string,
+): Promise<{ post: PostDetail; status: PostStatus } | null> {
+  if (!mongoose.isValidObjectId(id)) return null;
+  await connectDB();
+  const doc = await Post.findById(id).lean();
+  if (!doc) return null;
+  // PostDetail omits `status` (public posts are always published); the preview
+  // needs it for the draft/live banner, so return it alongside.
+  return { post: toPublicDetail(doc), status: (doc as { status: PostStatus }).status };
+}
+
+/** Just a post's status — cheap, for the autosave draft-only guard. */
+export async function getPostStatus(id: string): Promise<PostStatus | null> {
+  if (!mongoose.isValidObjectId(id)) return null;
+  await connectDB();
+  const doc = await Post.findById(id).select("status").lean();
+  return doc ? (doc.status as PostStatus) : null;
 }
 
 /** Posts whose review is stale, oldest first — for the dashboard freshness list. */

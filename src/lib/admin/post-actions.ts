@@ -15,6 +15,7 @@ import {
   markReviewed,
   deletePost,
   getForEdit,
+  getPostStatus,
 } from "./posts-admin";
 
 /**
@@ -72,6 +73,38 @@ export async function savePost(
 
   const newId = await createDraft(parsed.data);
   redirect(`/admin/posts/${newId}/edit`);
+}
+
+export interface AutosaveState {
+  savedAt?: string;
+  error?: string;
+}
+
+/**
+ * Debounced background save for DRAFTS only.
+ *
+ * Never redirects and never revalidates — a draft isn't public, so there's
+ * nothing to invalidate, and autosave must not push a half-typed edit live.
+ * (The client only enables it for drafts for that reason; this re-checks id and
+ * silently no-ops on an invalid form so a mid-keystroke field doesn't error.)
+ */
+export async function autosave(formData: FormData): Promise<AutosaveState> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return {};
+
+  // Enforce the client's draft-only rule server-side: never let autosave push a
+  // silent edit onto a published post (it doesn't revalidate).
+  if ((await getPostStatus(id)) !== "draft") return {};
+
+  const type = String(formData.get("type") ?? "");
+  if (!isContentType(type)) return {};
+
+  const parsed = parsePostForm(type, formData);
+  if (!parsed.ok) return { error: "Not saved — fix the highlighted fields." };
+
+  await updatePost(id, parsed.data);
+  return { savedAt: new Date().toISOString() };
 }
 
 export interface PublishState {

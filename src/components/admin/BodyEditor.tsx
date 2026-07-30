@@ -17,7 +17,15 @@ import { labelClass } from "./styles";
 
 const PREVIEW_DEBOUNCE_MS = 400;
 
-export function BodyEditor({ initialBody }: { initialBody: string }) {
+export function BodyEditor({
+  initialBody,
+  onChange,
+}: {
+  initialBody: string;
+  /** Fired on every body change — including programmatic palette/image inserts
+   *  that don't emit a DOM change event — so the parent can schedule autosave. */
+  onChange?: () => void;
+}) {
   const [body, setBody] = useState(initialBody);
   const [previewHtml, setPreviewHtml] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -25,6 +33,20 @@ export function BodyEditor({ initialBody }: { initialBody: string }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Pending selection to restore after a state-driven re-render.
   const pendingSelection = useRef<[number, number] | null>(null);
+  const bodyMounted = useRef(false);
+
+  // Notify the parent whenever the body changes (typing OR palette/upload
+  // inserts, which don't emit a DOM change event). Skips the initial mount so
+  // loading a draft isn't treated as a change. Depends only on `body`:
+  // `onChange` reads only refs/stable values, so a stale closure is harmless.
+  useEffect(() => {
+    if (!bodyMounted.current) {
+      bodyMounted.current = true;
+      return;
+    }
+    onChange?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [body]);
 
   // Debounced live preview.
   useEffect(() => {

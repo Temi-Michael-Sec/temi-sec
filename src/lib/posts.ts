@@ -98,8 +98,11 @@ function toListItem(doc: any): PostListItem {
   };
 }
 
+// Exported so the admin draft-preview can map a document to the exact same
+// PostDetail shape the public pages render — one mapper, no drift. It stays the
+// only thing shared; the published-only queries below are the public boundary.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function toDetail(doc: any): PostDetail {
+export function toDetail(doc: any): PostDetail {
   return {
     ...toListItem(doc),
     body: doc.body ?? "",

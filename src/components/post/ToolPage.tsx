@@ -3,6 +3,7 @@ import type { PostDetail, PostListItem } from "@/lib/posts";
 import { postHref } from "@/lib/routes";
 import { Prompt } from "./Prompt";
 import { PostBody } from "./PostBody";
+import { CoverImage } from "./CoverImage";
 import { StaleBanner } from "./StaleBanner";
 import { InstallTabs } from "./InstallTabs";
 import { TypeBadge, Badge } from "@/components/ui/Badge";
@@ -53,10 +54,10 @@ export function ToolPage({
         </div>
       </header>
 
+      <CoverImage image={post.coverImage} />
+
       <div className="measure py-8">
         <StaleBanner lastReviewedAt={post.lastReviewedAt} />
-
-        {post.bodyHtml && <PostBody html={post.bodyHtml} />}
 
         {post.installCommands && post.installCommands.length > 0 && (
           <section className="mt-8">
@@ -95,6 +96,13 @@ export function ToolPage({
               </table>
             </div>
           </section>
+        )}
+
+        {/* Long-form usage notes come after the man-page-style reference. */}
+        {post.bodyHtml && (
+          <div className="mt-8">
+            <PostBody html={post.bodyHtml} />
+          </div>
         )}
 
         {writeups.length > 0 && (

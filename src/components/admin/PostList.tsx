@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { AdminPostListItem } from "@/lib/admin/posts-admin";
 import { TYPE_LABEL } from "@/lib/admin/field-schema";
+import { formatDate } from "@/lib/format";
 
 /** A compact list of posts linking each to its editor. */
 export function PostList({
@@ -40,7 +41,7 @@ export function PostList({
                 {post.status}
               </span>
               <span className="hidden font-mono text-xs text-faint sm:inline">
-                {new Date(post.updatedAt).toLocaleDateString()}
+                {formatDate(post.updatedAt)}
               </span>
             </span>
           </Link>

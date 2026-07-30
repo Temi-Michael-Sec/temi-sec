@@ -1,9 +1,13 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef, useState, useTransition } from "react";
 import type { ContentType } from "@/lib/taxonomy";
 import type { AdminPostDetail } from "@/lib/admin/posts-admin";
-import { savePost, type PostFormState } from "@/lib/admin/post-actions";
+import {
+  savePost,
+  autosave,
+  type PostFormState,
+} from "@/lib/admin/post-actions";
 import { TYPE_LABEL } from "@/lib/admin/field-schema";
 import { BodyEditor } from "./BodyEditor";
 import { MetaForm } from "./MetaForm";
@@ -23,14 +27,48 @@ interface PostEditorProps {
 }
 
 const initialState: PostFormState = {};
+const AUTOSAVE_DEBOUNCE_MS = 2500;
 
 export function PostEditor({ mode, type, post }: PostEditorProps) {
   const [state, action, saving] = useActionState(savePost, initialState);
   const errors = state.errors ?? {};
 
+  // Autosave only existing DRAFTS: a new post has no id yet, and a published
+  // post must not have edits go live on every keystroke — those need Save.
+  const canAutosave = mode === "edit" && post?.status === "draft";
+  const formRef = useRef<HTMLFormElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [autosaveMsg, setAutosaveMsg] = useState("");
+  const [, startAutosave] = useTransition();
+
+  function scheduleAutosave() {
+    if (!canAutosave) return;
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      const formEl = formRef.current;
+      if (!formEl) return;
+      const data = new FormData(formEl);
+      startAutosave(async () => {
+        setAutosaveMsg("Saving…");
+        const res = await autosave(data);
+        setAutosaveMsg(
+          res.error ??
+            (res.savedAt
+              ? `Autosaved ${new Date(res.savedAt).toLocaleTimeString()}`
+              : ""),
+        );
+      });
+    }, AUTOSAVE_DEBOUNCE_MS);
+  }
+
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_17rem]">
-      <form action={action} className="space-y-6">
+      <form
+        ref={formRef}
+        action={action}
+        onChange={scheduleAutosave}
+        className="space-y-6"
+      >
         <input type="hidden" name="type" value={type} />
         {post && <input type="hidden" name="id" value={post.id} />}
 
@@ -139,7 +177,7 @@ export function PostEditor({ mode, type, post }: PostEditorProps) {
 
         <MetaForm type={type} values={post?.fields ?? {}} errors={errors} />
 
-        <BodyEditor initialBody={post?.body ?? ""} />
+        <BodyEditor initialBody={post?.body ?? ""} onChange={scheduleAutosave} />
 
         <div className="flex items-center gap-3 border-t border-border pt-4">
           <button type="submit" disabled={saving} className={buttonPrimary}>
@@ -147,6 +185,9 @@ export function PostEditor({ mode, type, post }: PostEditorProps) {
           </button>
           {state.ok && state.message && (
             <span className="font-mono text-xs text-ok">{state.message}</span>
+          )}
+          {autosaveMsg && (
+            <span className="font-mono text-xs text-faint">{autosaveMsg}</span>
           )}
         </div>
       </form>

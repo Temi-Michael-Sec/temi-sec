@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import type { ContentType } from "@/lib/taxonomy";
 import type { PostStatus } from "@/models/Post";
 import { postHref } from "@/lib/routes";
+import { formatDate } from "@/lib/format";
 import {
   publish,
   unpublish,
@@ -66,6 +67,15 @@ export function PublishPanel({
           {status}
         </span>
       </div>
+
+      <a
+        href={`/admin/posts/${id}/preview`}
+        target="_blank"
+        rel="noreferrer"
+        className="block font-mono text-xs text-accent underline-offset-4 hover:underline"
+      >
+        preview ↗
+      </a>
 
       {status === "published" && (
         <a
@@ -147,7 +157,7 @@ export function PublishPanel({
           </button>
           {lastReviewedAt && (
             <p className="mt-1 text-xs text-faint">
-              Last reviewed {new Date(lastReviewedAt).toLocaleDateString()}
+              Last reviewed {formatDate(lastReviewedAt)}
             </p>
           )}
         </form>

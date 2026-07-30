@@ -1,18 +1,15 @@
-# Security policy for this site — RFC 9116
+# Security policy for temi.sec — RFC 9116
 # https://www.rfc-editor.org/rfc/rfc9116
 #
 # Found a vulnerability here? Please report it privately using the contact
-# below rather than disclosing it publicly. I will acknowledge and work with
-# you on a fix.
+# below rather than disclosing it publicly. Reports are acknowledged and
+# worked through to a fix.
 
 Contact: mailto:michaelolasehinde285@gmail.com
-Expires: 2027-07-21T00:00:00.000Z
+Expires: 2027-07-15T00:00:00.000Z
+Canonical: https://temi-sec.vercel.app/.well-known/security.txt
 Preferred-Languages: en
 
-# TODO before this is meaningful:
-#   - Set Canonical: once a custom domain exists (a *.vercel.app canonical is
-#     not credible, and the file is only trusted when served from the domain
-#     it describes).
-#   - Add Encryption: with a PGP key URL if you want encrypted reports.
-#   - Keep Expires: under a year out and refresh it. An expired security.txt
-#     signals an abandoned site, which is worse than not having one.
+# Refresh Expires before it lapses (keep it under a year out) — an expired
+# security.txt reads as an abandoned site. Add `Encryption:` with a PGP key URL
+# if you want encrypted reports, and update Canonical if a custom domain lands.

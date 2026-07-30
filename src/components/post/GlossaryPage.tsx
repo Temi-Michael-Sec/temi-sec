@@ -2,6 +2,7 @@ import Link from "next/link";
 import { type PostDetail, existingSlugs } from "@/lib/posts";
 import { Prompt } from "./Prompt";
 import { PostBody } from "./PostBody";
+import { CoverImage } from "./CoverImage";
 
 /**
  * Glossary term page — a dictionary/wiki entry. The one-line definition
@@ -34,6 +35,8 @@ export async function GlossaryPage({ post }: { post: PostDetail }) {
           </p>
         )}
       </header>
+
+      <CoverImage image={post.coverImage} />
 
       <div className="measure py-8">
         {post.bodyHtml && <PostBody html={post.bodyHtml} />}

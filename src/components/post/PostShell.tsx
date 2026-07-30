@@ -1,5 +1,6 @@
 import type { PostDetail } from "@/lib/posts";
 import { PostBody } from "./PostBody";
+import { CoverImage } from "./CoverImage";
 import { TableOfContents } from "./TableOfContents";
 import { References } from "./References";
 import { StaleBanner } from "./StaleBanner";
@@ -29,6 +30,7 @@ export function PostShell({
   return (
     <div className="mx-auto max-w-5xl px-5">
       {header}
+      <CoverImage image={post.coverImage} />
       <div
         className={
           hasToc
