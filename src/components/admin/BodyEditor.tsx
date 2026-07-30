@@ -198,9 +198,9 @@ export function BodyEditor({
             {previewHtml ? (
               // `key` remounts PostBody whenever the rendered html changes, so
               // each preview is a clean mount that enhances once. Without it,
-              // repeatedly resetting dangerouslySetInnerHTML while PostBody does
-              // its own DOM surgery leaves stale/empty nodes — which made a
-              // YouTube embed (an empty div until enhanced) vanish on edit.
+              // repeatedly replacing the injected markup while PostBody does its
+              // own DOM surgery leaves stale/empty nodes — which made a YouTube
+              // embed (an empty div until enhanced) vanish on edit.
               <PostBody key={previewHtml} html={previewHtml} />
             ) : (
               <p className="font-mono text-sm text-faint">Preview…</p>
