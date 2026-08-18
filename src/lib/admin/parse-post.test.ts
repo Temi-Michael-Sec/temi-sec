@@ -42,6 +42,28 @@ describe("parsePostForm — base fields", () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.errors.slug).toBeDefined();
   });
+
+  it("parses references (Title | URL per line), dropping incomplete rows", () => {
+    const r = parsePostForm(
+      "article",
+      form([
+        ["title", "X"],
+        [
+          "references",
+          "OWASP XSS | https://owasp.org/xss\nno url here\nNVD | https://nvd.nist.gov/1",
+        ],
+      ]),
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.data.references).toHaveLength(2);
+      expect(r.data.references[0]).toMatchObject({
+        title: "OWASP XSS",
+        url: "https://owasp.org/xss",
+      });
+      expect(r.data.references[0].accessedAt).toBeInstanceOf(Date);
+    }
+  });
 });
 
 describe("parsePostForm — type-specific", () => {

@@ -23,6 +23,7 @@ export interface ParsedPostData {
   tags: string[];
   body: string;
   coverImage: CoverImage | null;
+  references: { title: string; url: string; accessedAt: Date }[];
   /** Validated type-specific fields, keyed by field name. */
   typeFields: Record<string, unknown>;
   /** Feeds searchTokens derivation, for tool/glossary. */
@@ -42,6 +43,20 @@ function commaSplit(value: string): string[] {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+/** Parses a "Title | URL" per-line references field. accessedAt is set now. */
+function parseReferences(
+  value: string,
+): { title: string; url: string; accessedAt: Date }[] {
+  const now = new Date();
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.split("|").map((cell) => cell.trim()))
+    .filter((cells) => cells[0] && cells[1])
+    .map(([title, url]) => ({ title, url, accessedAt: now }));
 }
 
 /** Splits a "lines" textarea into rows of "a | b | c" cells. */
@@ -189,6 +204,7 @@ export function parsePostForm(
 
   const body = String(formData.get("body") ?? "");
   const tags = commaSplit(String(formData.get("tags") ?? ""));
+  const references = parseReferences(String(formData.get("references") ?? ""));
 
   const coverUrl = String(formData.get("coverImageUrl") ?? "").trim();
   const coverImage: CoverImage | null = coverUrl
@@ -217,6 +233,7 @@ export function parsePostForm(
       tags,
       body,
       coverImage,
+      references,
       typeFields,
       tokenSource: buildTokenSource(type, typeFields),
     },

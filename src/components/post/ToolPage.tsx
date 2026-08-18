@@ -4,6 +4,7 @@ import { postHref } from "@/lib/routes";
 import { Prompt } from "./Prompt";
 import { PostBody } from "./PostBody";
 import { CoverImage } from "./CoverImage";
+import { References } from "./References";
 import { StaleBanner } from "./StaleBanner";
 import { InstallTabs } from "./InstallTabs";
 import { TypeBadge, Badge } from "@/components/ui/Badge";
@@ -122,6 +123,8 @@ export function ToolPage({
             </div>
           </section>
         )}
+
+        <References references={post.references} />
       </div>
     </div>
   );

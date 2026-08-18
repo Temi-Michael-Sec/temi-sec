@@ -48,6 +48,22 @@ export function Palette({
       <button
         type="button"
         className={btn}
+        title="Bulleted list"
+        onClick={() => onInsert("- item\n- item")}
+      >
+        • list
+      </button>
+      <button
+        type="button"
+        className={btn}
+        title="Numbered list"
+        onClick={() => onInsert("1. item\n2. item")}
+      >
+        1. list
+      </button>
+      <button
+        type="button"
+        className={btn}
         title="Code block"
         onClick={() => onInsert("```bash\n\n```")}
       >

@@ -177,6 +177,24 @@ body {
 .post-body ol {
   padding-left: 1.3rem;
 }
+/* Tailwind's preflight resets list markers to none; restore them for prose. */
+.post-body ul {
+  list-style: disc;
+}
+.post-body ol {
+  list-style: decimal;
+}
+.post-body ul ul {
+  list-style: circle;
+}
+/* GFM task lists carry their own checkbox as the marker. */
+.post-body ul.contains-task-list {
+  list-style: none;
+  padding-left: 0;
+}
+.post-body li.task-list-item {
+  list-style: none;
+}
 .post-body li + li {
   margin-top: 0.35rem;
 }

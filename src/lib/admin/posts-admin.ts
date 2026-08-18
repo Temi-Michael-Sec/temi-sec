@@ -64,6 +64,7 @@ export interface AdminPostDetail {
   tags: string[];
   body: string;
   coverImage: CoverImage | null;
+  references: { title: string; url: string; accessedAt: string }[];
   status: PostStatus;
   publishedAt: string | null;
   lastReviewedAt: string | null;
@@ -101,6 +102,13 @@ function toDetail(doc: any): AdminPostDetail {
     tags: doc.tags ?? [],
     body: doc.body ?? "",
     coverImage: doc.coverImage ?? null,
+    references: (doc.references ?? []).map(
+      (r: { title: string; url: string; accessedAt: Date }) => ({
+        title: r.title,
+        url: r.url,
+        accessedAt: iso(r.accessedAt) ?? "",
+      }),
+    ),
     status: doc.status,
     publishedAt: iso(doc.publishedAt),
     lastReviewedAt: iso(doc.lastReviewedAt),
@@ -218,6 +226,7 @@ export async function createDraft(data: ParsedPostData): Promise<string> {
     excerpt: data.excerpt,
     tags: data.tags,
     coverImage: data.coverImage,
+    references: data.references,
     body: data.body,
     ...data.typeFields,
     ...derived,
@@ -248,6 +257,7 @@ export async function updatePost(
     excerpt: data.excerpt,
     tags: data.tags,
     coverImage: data.coverImage,
+    references: data.references,
     body: data.body,
     ...data.typeFields,
     ...derived,

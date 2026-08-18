@@ -3,6 +3,7 @@ import { type PostDetail, existingSlugs } from "@/lib/posts";
 import { Prompt } from "./Prompt";
 import { PostBody } from "./PostBody";
 import { CoverImage } from "./CoverImage";
+import { References } from "./References";
 
 /**
  * Glossary term page — a dictionary/wiki entry. The one-line definition
@@ -59,6 +60,8 @@ export async function GlossaryPage({ post }: { post: PostDetail }) {
             </div>
           </section>
         )}
+
+        <References references={post.references} />
       </div>
     </div>
   );

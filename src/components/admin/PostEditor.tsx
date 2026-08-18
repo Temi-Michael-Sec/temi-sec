@@ -29,6 +29,13 @@ interface PostEditorProps {
 const initialState: PostFormState = {};
 const AUTOSAVE_DEBOUNCE_MS = 2500;
 
+/** Serializes stored references back to "Title | URL" lines for editing. */
+function referencesToText(
+  refs?: { title: string; url: string }[],
+): string {
+  return (refs ?? []).map((r) => `${r.title} | ${r.url}`).join("\n");
+}
+
 export function PostEditor({ mode, type, post }: PostEditorProps) {
   const [state, action, saving] = useActionState(savePost, initialState);
   const errors = state.errors ?? {};
@@ -173,6 +180,22 @@ export function PostEditor({ mode, type, post }: PostEditorProps) {
             name="coverImageHeight"
             defaultValue={post?.coverImage?.height ?? 0}
           />
+        </div>
+
+        <div>
+          <label htmlFor="references" className={labelClass}>
+            References
+          </label>
+          <textarea
+            id="references"
+            name="references"
+            rows={3}
+            defaultValue={referencesToText(post?.references)}
+            className={`${inputClass} font-mono`}
+          />
+          <p className={helpClass}>
+            One per line — Title | URL. Shown as sources at the bottom of the post.
+          </p>
         </div>
 
         <MetaForm type={type} values={post?.fields ?? {}} errors={errors} />

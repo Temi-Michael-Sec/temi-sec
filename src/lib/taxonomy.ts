@@ -181,6 +181,42 @@ export const CTF_CATEGORIES = [
     blurb:
       "Protocol abuse, pivoting, traffic analysis and attacks against network services.",
   },
+  {
+    slug: "privesc",
+    label: "Privilege Escalation",
+    blurb:
+      "Going from a foothold to root or SYSTEM — SUID and sudo abuse, kernel exploits, cron and service misconfiguration, token theft.",
+  },
+  {
+    slug: "steganography",
+    label: "Steganography",
+    blurb:
+      "Data hidden inside images, audio and other files — extraction, LSB analysis and embedded payloads.",
+  },
+  {
+    slug: "mobile",
+    label: "Mobile",
+    blurb:
+      "Android and iOS targets — APK reversing, insecure storage and mobile application logic flaws.",
+  },
+  {
+    slug: "cloud",
+    label: "Cloud",
+    blurb:
+      "AWS, Azure and GCP misconfiguration — exposed metadata, over-permissive roles and open storage.",
+  },
+  {
+    slug: "hardware",
+    label: "Hardware & IoT",
+    blurb:
+      "Firmware, embedded devices and hardware interfaces — UART, JTAG and firmware extraction.",
+  },
+  {
+    slug: "misc",
+    label: "Misc",
+    blurb:
+      "Challenges that don't fit a standard class — scripting puzzles, jails and one-off tricks.",
+  },
 ] as const satisfies readonly Facet[];
 
 // ─── Tool categories ─────────────────────────────────────────────────────────
@@ -221,6 +257,35 @@ export const TOOL_CATEGORIES = [
     label: "Forensics & Analysis",
     blurb:
       "Memory, disk and network analysis tooling for working out what happened.",
+  },
+  {
+    slug: "networking",
+    label: "Networking & Remote Access",
+    blurb:
+      "Remote shells, tunnelling and pivoting — SSH, netcat, socat, chisel and proxychains.",
+  },
+  {
+    slug: "reversing",
+    label: "Reverse Engineering",
+    blurb:
+      "Disassemblers, decompilers and debuggers for taking binaries apart.",
+  },
+  {
+    slug: "wireless",
+    label: "Wireless",
+    blurb: "Wi-Fi, Bluetooth and RF capture and cracking tooling.",
+  },
+  {
+    slug: "osint",
+    label: "OSINT",
+    blurb:
+      "Open-source intelligence gathering — people, domains and exposed infrastructure.",
+  },
+  {
+    slug: "utility",
+    label: "Utilities",
+    blurb:
+      "General command-line workhorses — file, text and HTTP tools that show up in every engagement.",
   },
   {
     slug: "defensive",
