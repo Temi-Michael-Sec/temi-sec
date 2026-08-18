@@ -31,6 +31,20 @@ export function PostShell({
     <div className="mx-auto max-w-5xl px-5">
       {header}
       <CoverImage image={post.coverImage} />
+
+      {/* Small screens: a collapsible TOC at the top, so it isn't stranded below
+          the article. Desktop uses the sticky rail below instead. */}
+      {hasToc && (
+        <details className="mt-6 rounded-md border border-border bg-surface lg:hidden">
+          <summary className="cursor-pointer px-4 py-2.5 font-mono text-[0.7rem] uppercase tracking-[0.1em] text-faint">
+            On this page
+          </summary>
+          <div className="border-t border-border px-4 py-3">
+            <TableOfContents toc={post.toc} showHeading={false} />
+          </div>
+        </details>
+      )}
+
       <div
         className={
           hasToc
@@ -44,7 +58,7 @@ export function PostShell({
           <References references={post.references} />
         </article>
         {hasToc && (
-          <aside className="self-start lg:sticky lg:top-20">
+          <aside className="hidden self-start lg:sticky lg:top-20 lg:block">
             <TableOfContents toc={post.toc} />
           </aside>
         )}

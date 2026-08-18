@@ -11,7 +11,14 @@ import type { TocEntry } from "@/models/Post";
  * The active-section highlight uses an IntersectionObserver watching each
  * heading, which is far cheaper than a scroll handler and doesn't jank.
  */
-export function TableOfContents({ toc }: { toc: TocEntry[] }) {
+export function TableOfContents({
+  toc,
+  showHeading = true,
+}: {
+  toc: TocEntry[];
+  /** Hidden when the caller already labels the list (e.g. a <details> summary). */
+  showHeading?: boolean;
+}) {
   const [activeId, setActiveId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,9 +48,11 @@ export function TableOfContents({ toc }: { toc: TocEntry[] }) {
 
   return (
     <nav aria-label="On this page" className="text-sm">
-      <p className="mb-3 font-mono text-[0.7rem] uppercase tracking-[0.1em] text-faint">
-        On this page
-      </p>
+      {showHeading && (
+        <p className="mb-3 font-mono text-[0.7rem] uppercase tracking-[0.1em] text-faint">
+          On this page
+        </p>
+      )}
       <ul className="flex flex-col border-l border-border">
         {toc.map((entry) => {
           const active = entry.id === activeId;
