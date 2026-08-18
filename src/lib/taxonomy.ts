@@ -212,6 +212,12 @@ export const CTF_CATEGORIES = [
       "Firmware, embedded devices and hardware interfaces — UART, JTAG and firmware extraction.",
   },
   {
+    slug: "utility",
+    label: "Utilities",
+    blurb:
+      "Challenges solved with standard command-line tools and shell utilities — using common binaries in unusual ways.",
+  },
+  {
     slug: "misc",
     label: "Misc",
     blurb:
