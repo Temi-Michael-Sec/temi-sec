@@ -156,42 +156,45 @@ export function PromptDialog({
   const titleId = useId();
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const submit = () => onSubmit(inputRef.current?.value ?? "");
 
+  // Deliberately NOT a <form>: this dialog is rendered inside the editor's own
+  // <form>, and a nested <form> is invalid HTML (it throws a hydration error).
+  // Enter-to-submit is wired on the input instead.
   return (
     <Modal open={open} onClose={onCancel} titleId={titleId}>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          onSubmit(inputRef.current?.value ?? "");
+      <h2 id={titleId} className="text-sm font-semibold tracking-[-0.01em]">
+        {title}
+      </h2>
+      <label htmlFor={inputId} className="mt-3 block text-xs text-faint">
+        {label}
+      </label>
+      {/* Uncontrolled + keyed on `open` so each opening starts fresh from
+          defaultValue without a state-sync effect. */}
+      <input
+        key={open ? "open" : "closed"}
+        id={inputId}
+        ref={inputRef}
+        type="text"
+        defaultValue={defaultValue}
+        placeholder={placeholder}
+        autoFocus
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            submit();
+          }
         }}
-      >
-        <h2 id={titleId} className="text-sm font-semibold tracking-[-0.01em]">
-          {title}
-        </h2>
-        <label htmlFor={inputId} className="mt-3 block text-xs text-faint">
-          {label}
-        </label>
-        {/* Uncontrolled + keyed on `open` so each opening starts fresh from
-            defaultValue without a state-sync effect. */}
-        <input
-          key={open ? "open" : "closed"}
-          id={inputId}
-          ref={inputRef}
-          type="text"
-          defaultValue={defaultValue}
-          placeholder={placeholder}
-          autoFocus
-          className={inputClass}
-        />
-        <div className="mt-5 flex justify-end gap-2">
-          <button type="button" onClick={onCancel} className={buttonGhost}>
-            Cancel
-          </button>
-          <button type="submit" className={buttonPrimary}>
-            {confirmLabel}
-          </button>
-        </div>
-      </form>
+        className={inputClass}
+      />
+      <div className="mt-5 flex justify-end gap-2">
+        <button type="button" onClick={onCancel} className={buttonGhost}>
+          Cancel
+        </button>
+        <button type="button" onClick={submit} className={buttonPrimary}>
+          {confirmLabel}
+        </button>
+      </div>
     </Modal>
   );
 }
