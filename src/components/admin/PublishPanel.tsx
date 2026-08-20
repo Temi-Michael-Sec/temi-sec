@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import type { ContentType } from "@/lib/taxonomy";
 import type { PostStatus } from "@/models/Post";
 import { postHref } from "@/lib/routes";
 import { formatDate } from "@/lib/format";
+import { fireConfetti } from "@/lib/confetti";
 import {
   publish,
   unpublish,
@@ -13,6 +14,7 @@ import {
   type PublishState,
 } from "@/lib/admin/post-actions";
 import { buttonPrimary, buttonGhost } from "./styles";
+import { ConfirmDialog } from "./Modal";
 
 /**
  * The lifecycle controls for a saved post. Publish runs the server-side guards
@@ -50,6 +52,26 @@ export function PublishPanel({
     publish,
     initialState,
   );
+
+  // Which destructive action is awaiting confirmation, if any.
+  const [confirming, setConfirming] = useState<null | "unpublish" | "delete">(
+    null,
+  );
+  const publishBtnRef = useRef<HTMLButtonElement>(null);
+  const unpublishFormRef = useRef<HTMLFormElement>(null);
+  const deleteFormRef = useRef<HTMLFormElement>(null);
+  const celebrated = useRef(false);
+
+  // Celebrate a successful publish once, bursting from the Publish button.
+  useEffect(() => {
+    if (state.ok && state.message === "Published." && !celebrated.current) {
+      celebrated.current = true;
+      const rect = publishBtnRef.current?.getBoundingClientRect();
+      fireConfetti(
+        rect ? { x: rect.left + rect.width / 2, y: rect.top } : undefined,
+      );
+    }
+  }, [state]);
 
   return (
     <aside className="space-y-4 rounded-md border border-border bg-surface p-4">
@@ -136,14 +158,23 @@ export function PublishPanel({
               </label>
             </div>
           )}
-          <button type="submit" disabled={publishing} className={buttonPrimary}>
+          <button
+            ref={publishBtnRef}
+            type="submit"
+            disabled={publishing}
+            className={buttonPrimary}
+          >
             {publishing ? "Publishing…" : "Publish"}
           </button>
         </form>
       ) : (
-        <form action={unpublish}>
+        <form ref={unpublishFormRef} action={unpublish}>
           <input type="hidden" name="id" value={id} />
-          <button type="submit" className={buttonGhost}>
+          <button
+            type="button"
+            onClick={() => setConfirming("unpublish")}
+            className={buttonGhost}
+          >
             Unpublish
           </button>
         </form>
@@ -163,22 +194,42 @@ export function PublishPanel({
         </form>
       )}
 
-      <form
-        action={remove}
-        onSubmit={(e) => {
-          if (!window.confirm("Delete this post permanently?")) {
-            e.preventDefault();
-          }
-        }}
-      >
+      <form ref={deleteFormRef} action={remove}>
         <input type="hidden" name="id" value={id} />
         <button
-          type="submit"
+          type="button"
+          onClick={() => setConfirming("delete")}
           className="text-xs text-faint underline-offset-4 hover:text-crit hover:underline"
         >
           delete post
         </button>
       </form>
+
+      <ConfirmDialog
+        open={confirming === "unpublish"}
+        title="Unpublish this post?"
+        message="It will be taken off the live site and revert to a draft. You can publish it again later."
+        confirmLabel="Unpublish"
+        tone="danger"
+        onConfirm={() => {
+          setConfirming(null);
+          unpublishFormRef.current?.requestSubmit();
+        }}
+        onCancel={() => setConfirming(null)}
+      />
+
+      <ConfirmDialog
+        open={confirming === "delete"}
+        title="Delete this post permanently?"
+        message="This can't be undone — the post and its content are removed from the database for good."
+        confirmLabel="Delete"
+        tone="danger"
+        onConfirm={() => {
+          setConfirming(null);
+          deleteFormRef.current?.requestSubmit();
+        }}
+        onCancel={() => setConfirming(null)}
+      />
     </aside>
   );
 }

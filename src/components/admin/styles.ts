@@ -24,3 +24,8 @@ export const buttonGhost =
   "inline-flex items-center justify-center rounded-md border border-border " +
   "bg-surface px-4 py-2 text-sm font-medium text-foreground transition-colors " +
   "hover:border-accent disabled:cursor-not-allowed disabled:opacity-50";
+
+export const buttonDanger =
+  "inline-flex items-center justify-center rounded-md bg-crit px-4 py-2 " +
+  "text-sm font-medium text-white transition-opacity hover:opacity-90 " +
+  "disabled:cursor-not-allowed disabled:opacity-50";

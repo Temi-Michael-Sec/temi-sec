@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PostBody } from "@/components/post/PostBody";
 import { Palette } from "./Palette";
+import { AlertDialog, PromptDialog } from "./Modal";
 import { labelClass } from "./styles";
 
 /**
@@ -29,6 +30,11 @@ export function BodyEditor({
   const [body, setBody] = useState(initialBody);
   const [previewHtml, setPreviewHtml] = useState("");
   const [uploading, setUploading] = useState(false);
+  // Upload-failure message (drives the AlertDialog) and the just-uploaded image
+  // URL awaiting alt text (drives the PromptDialog) — replacing window.alert /
+  // window.prompt.
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Pending selection to restore after a state-driven re-render.
@@ -114,38 +120,37 @@ export function BodyEditor({
     [body],
   );
 
-  const insertImage = useCallback(
-    (url: string) => {
-      const alt = window.prompt("Alt text (describe the image):", "") ?? "";
-      insert(`![${alt}](${url})`);
+  // Insert the uploaded image once the user has supplied (or skipped) alt text.
+  const finishImageInsert = useCallback(
+    (alt: string) => {
+      if (pendingImageUrl) insert(`![${alt}](${pendingImageUrl})`);
+      setPendingImageUrl(null);
     },
-    [insert],
+    [insert, pendingImageUrl],
   );
 
-  const uploadFile = useCallback(
-    async (file: File) => {
-      setUploading(true);
-      try {
-        const form = new FormData();
-        form.append("file", file);
-        const res = await fetch("/api/admin/upload", {
-          method: "POST",
-          body: form,
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          window.alert(data.error ?? "Upload failed.");
-          return;
-        }
-        insertImage(data.url);
-      } catch {
-        window.alert("Upload failed.");
-      } finally {
-        setUploading(false);
+  const uploadFile = useCallback(async (file: File) => {
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUploadError(data.error ?? "Upload failed.");
+        return;
       }
-    },
-    [insertImage],
-  );
+      // Open the alt-text prompt; the image is inserted on confirm/cancel.
+      setPendingImageUrl(data.url);
+    } catch {
+      setUploadError("Upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  }, []);
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -208,6 +213,23 @@ export function BodyEditor({
           </div>
         </div>
       </div>
+
+      <PromptDialog
+        open={pendingImageUrl !== null}
+        title="Add alt text"
+        label="Describe the image — read by screen readers and shown if it fails to load. Leave blank to skip."
+        placeholder="e.g. nmap scan output showing open ports"
+        confirmLabel="Insert image"
+        onSubmit={finishImageInsert}
+        onCancel={() => finishImageInsert("")}
+      />
+
+      <AlertDialog
+        open={uploadError !== null}
+        title="Upload failed"
+        message={uploadError ?? ""}
+        onClose={() => setUploadError(null)}
+      />
     </div>
   );
 }
