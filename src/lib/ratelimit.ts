@@ -75,6 +75,17 @@ export async function checkLoginRate(identifier: string): Promise<boolean> {
 }
 
 /**
+ * Health check / keep-alive. A real round-trip, so it also counts as activity
+ * on a free Upstash database that would otherwise be deleted when idle.
+ * Throws if Redis is unconfigured or unreachable.
+ */
+export async function pingRedis(): Promise<void> {
+  if (!redis) throw new Error("Upstash is not configured");
+  const reply = await redis.ping();
+  if (reply !== "PONG") throw new Error(`Unexpected PING reply: ${reply}`);
+}
+
+/**
  * Read-only: if `identifier` has no login attempts left, the number of seconds
  * until the window frees one up (for a Retry-After header); otherwise null.
  * Uses getRemaining, which does NOT consume a token.
