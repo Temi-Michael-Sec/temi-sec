@@ -109,9 +109,11 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     {
-      // Everything except API routes, static assets, image optimisation and
-      // the favicon — none of those render HTML that needs a nonce.
-      source: "/((?!api|_next/static|_next/image|favicon.ico).*)",
+      // Everything except API routes, static assets, image optimisation, the
+      // favicon and PDFs — none render HTML that needs a nonce. PDFs especially:
+      // Chrome renders them in an embedded viewer that a page CSP's
+      // `object-src 'none'` would blank out. The CV must open as a plain link.
+      source: "/((?!api|_next/static|_next/image|favicon.ico|.*\\.pdf$).*)",
       // Skip <Link> prefetches: a prefetched payload can't use a nonce minted
       // for a request that never becomes the page.
       missing: [

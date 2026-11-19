@@ -5,6 +5,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
+import { SITE_URL, RSS_ALTERNATE } from "@/lib/seo";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,11 +17,8 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Single canonical-URL source, so changing hosts is one env var. See README.
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "temi.sec — Security Notes",
     template: "%s · temi.sec",
@@ -29,7 +27,7 @@ export const metadata: Metadata = {
     "Security notes, CTF writeups, and a tool reference that gets used.",
   // RSS autodiscovery — pasting the homepage URL into a reader finds the feed.
   alternates: {
-    types: { "application/rss+xml": `${siteUrl}/rss.xml` },
+    types: RSS_ALTERNATE,
   },
 };
 

@@ -15,7 +15,7 @@ export function Footer() {
             RSS
           </Link>
           <a
-            href="https://github.com/Temi-Michael-Sec"
+            href="https://github.com/Temi-Michael"
             target="_blank"
             rel="noopener noreferrer"
             className="transition-colors hover:text-foreground"

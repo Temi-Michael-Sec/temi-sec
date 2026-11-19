@@ -11,76 +11,80 @@ gsap.registerPlugin(ScrollTrigger, useGSAP);
 /* ─────────────────────────────────────────────────────────────────────────────
  * EDIT ME — everything personal lives in this one block, kept out of the JSX and
  * the animation code below. Change a string here and the page updates; you never
- * have to touch layout or GSAP. Replace the bracketed placeholders with the real
- * platforms, certs and contact details.
+ * have to touch layout or GSAP. Keep every claim here backed by the CV
+ * (public/Olasehinde_Michael_CV.pdf) — the two are read side by side.
  * ───────────────────────────────────────────────────────────────────────────── */
 
 const INTRO = [
-  "I'm Temi — a cybersecurity student working through offensive and defensive security in the open, and writing down what actually sticks.",
+  "I'm Temi — a software developer and application security engineer in Lagos. I build Go and Next.js systems for payments and fintech, and I keep asking how each feature could be abused: I harden APIs, audit apps before launch, and write small security tools while studying Cybersecurity.",
   "temi.sec is the notebook: CTF writeups that explain the reasoning rather than dumping commands, a tool reference I keep open during boxes, GRC policy templates worth adapting, and the occasional longer piece. If it wouldn't help someone six months behind me, it doesn't ship.",
 ] as const;
 
-/** Skills grouped by domain. Labels intentionally echo the site's taxonomy. */
+/** Skills grouped by domain — mirrors the CV's Skills section. */
 const SKILLS: { area: string; note: string; items: string[] }[] = [
   {
-    area: "Offensive",
-    note: "where most of my time goes",
+    area: "Application Security",
+    note: "the core of the work",
     items: [
-      "Web exploitation",
-      "Privilege escalation",
-      "Enumeration & recon",
-      "Binary exploitation",
-      "Reverse engineering",
-      "OSINT",
+      "Secure code review",
+      "Security audits",
+      "OWASP Top 10",
+      "AuthN / AuthZ (JWT, RBAC)",
+      "CSRF & SSRF defence",
+      "Rate limiting",
+      "Log redaction",
+      "CSP & HSTS",
     ],
   },
   {
-    area: "Tooling",
+    area: "Security Tools",
     note: "the reach-for-it set",
     items: [
-      "nmap",
-      "ffuf / gobuster",
       "Burp Suite",
-      "Metasploit",
-      "ssh / netcat",
-      "hashcat / John",
-      "Wireshark",
-      "linPEAS / winPEAS",
+      "Nmap",
+      "GoBuster",
+      "Semgrep",
+      "Snyk",
+      "gitleaks",
+      "npm audit",
     ],
   },
   {
-    area: "Defensive & GRC",
-    note: "the other half of the job",
+    area: "Languages & Frameworks",
+    note: "what I build with",
     items: [
-      "Security policy writing",
-      "System hardening",
-      "Threat modelling",
-      "ISO/IEC 27001",
-      "NIST CSF 2.0",
-      "SOC 2",
-    ],
-  },
-  {
-    area: "Build & Engineering",
-    note: "how this site exists",
-    items: [
+      "Go",
       "TypeScript",
+      "Python",
+      "SQL",
+      "C",
+      "Bash",
+      "Gin / GORM",
       "Next.js / React",
+    ],
+  },
+  {
+    area: "Data & Tooling",
+    note: "where it runs",
+    items: [
+      "PostgreSQL",
       "MongoDB",
-      "Tailwind CSS",
-      "Secure app design",
-      "CI/CD on Vercel",
+      "Redis",
+      "Supabase",
+      "Docker",
+      "GitHub Actions",
+      "Vercel",
+      "Linux",
     ],
   },
 ];
 
 /** The `~/now` block — the one section you'll update most often. */
-// Interim copy that describes the site, not credentials. Platform, certs and
-// current study get filled in from the CV — never guessed.
 const NOW: string[] = [
-  "Writing up retired boxes and rooms — the reasoning first, the commands second.",
-  "Growing the tool reference with the commands I actually reach for.",
-  "New writeups land here first.",
+  "Studying for a B.Sc. in Cybersecurity at MIVA Open University.",
+  "Building Go and Next.js payment features at Bleeprs, and hardening Nelius DAO's Go API.",
+  "Building Watchdog — TLS, domain-expiry and security-header monitoring with an SSRF-safe checker.",
+  "Recently certified: ALX Cybersecurity and ALX ProDev Frontend (2026).",
 ];
 
 /**
@@ -111,10 +115,16 @@ const BUILD: { title: string; detail: string }[] = [
 ];
 
 const LINKS: { label: string; href: string; external: boolean }[] = [
-  { label: "GitHub", href: "https://github.com/Temi-Michael-Sec", external: true },
+  // A plain link, never an iframe/object: X-Frame-Options DENY and the CSP's
+  // object-src 'none' / frame-ancestors 'none' would (rightly) block an embed.
+  { label: "CV (PDF)", href: "/Olasehinde_Michael_CV.pdf", external: true },
+  // Main profile (all repos, as on the CV) vs this site's own source — the
+  // repo is itself evidence of the security work described above.
+  { label: "GitHub", href: "https://github.com/Temi-Michael", external: true },
+  { label: "Site source", href: "https://github.com/Temi-Michael-Sec/temi-sec", external: true },
+  { label: "LinkedIn", href: "https://www.linkedin.com/in/temi-michael", external: true },
   { label: "RSS", href: "/rss.xml", external: false },
   { label: "security.txt", href: "/.well-known/security.txt", external: false },
-  // { label: "Email", href: "mailto:[you@example.com]", external: true },
 ];
 
 // ── Small building blocks ────────────────────────────────────────────────────
