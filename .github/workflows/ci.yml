@@ -29,19 +29,9 @@ jobs:
 
       # Tripwire for the bug class that produced this project's two worst
       # spec defects — both lived at the seam where trusted HTML is injected.
-      # Any new raw-HTML sink must be added to the allowlist deliberately,
-      # in a PR where someone has to justify it.
+      # The same script runs as `prebuild`, so it also fails Vercel deploys.
       - name: Guard raw HTML sinks
-        run: |
-          ALLOWED='src/components/post/PostBody.tsx|src/components/comments/CommentItem.tsx'
-          HITS=$(grep -rn "dangerouslySetInnerHTML" src/ 2>/dev/null \
-                 | grep -Ev "$ALLOWED" || true)
-          if [ -n "$HITS" ]; then
-            echo "::error::dangerouslySetInnerHTML outside the allowlist:"
-            echo "$HITS"
-            exit 1
-          fi
-          echo "No unallowlisted raw HTML sinks."
+        run: npm run check:html-sinks
 
       # NEXT_PUBLIC_* ships to the browser. A secret here is a public secret.
       - name: Guard client-exposed secrets

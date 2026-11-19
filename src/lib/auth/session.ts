@@ -31,7 +31,19 @@ export async function readSession(): Promise<SessionPayload | null> {
   return verifySession(token);
 }
 
-/** Clears the session cookie (logout). */
+/**
+ * Clears the session cookie (logout).
+ *
+ * NOT `cookies().delete(name)`: that emits a bare `name=; Path=/; Expires=…`
+ * with no `Secure`, and browsers reject ANY Set-Cookie for a `__Host-` name that
+ * lacks Secure — so in production the delete would be silently dropped and the
+ * session would survive logout. Expiring it with the same attributes it was set
+ * with is the only form the browser will accept.
+ */
 export async function deleteSession(): Promise<void> {
-  (await cookies()).delete(SESSION_COOKIE_NAME);
+  (await cookies()).set(SESSION_COOKIE_NAME, "", {
+    ...cookieOptions,
+    maxAge: 0,
+    expires: new Date(0),
+  });
 }

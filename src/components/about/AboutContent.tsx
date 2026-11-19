@@ -75,10 +75,11 @@ const SKILLS: { area: string; note: string; items: string[] }[] = [
 ];
 
 /** The `~/now` block — the one section you'll update most often. */
+// Interim copy that describes the site, not credentials. Platform, certs and
+// current study get filled in from the CV — never guessed.
 const NOW: string[] = [
-  "Working through [HackTheBox / TryHackMe — add path or rank].",
-  "Preparing for [OSCP / eJPT / Security+ — pick one].",
-  "Going deeper on [Active Directory / web app pentesting / cloud — pick one].",
+  "Writing up retired boxes and rooms — the reasoning first, the commands second.",
+  "Growing the tool reference with the commands I actually reach for.",
   "New writeups land here first.",
 ];
 

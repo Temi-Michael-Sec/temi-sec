@@ -7,6 +7,7 @@ import { connectDB } from "@/lib/db";
 import { User } from "@/models/User";
 import { createSession, deleteSession } from "@/lib/auth/session";
 import { checkLoginRate } from "@/lib/ratelimit";
+import { clientIp } from "@/lib/client-ip";
 
 /**
  * Admin login as a Server Action.
@@ -29,21 +30,6 @@ const GENERIC_ERROR = "Invalid email or password.";
 
 export interface LoginState {
   error?: string;
-}
-
-function clientIp(headerList: Headers): string {
-  // Prefer x-real-ip: on Vercel the platform sets it to the connecting client,
-  // so unlike the LEFTMOST x-forwarded-for value it is not client-controllable
-  // (a spoofed leftmost XFF could otherwise be rotated to evade the throttle).
-  // Fall back to the LAST x-forwarded-for hop — the one the trusted proxy
-  // appended — then to a constant so unknowns share one bucket.
-  const realIp = headerList.get("x-real-ip")?.trim();
-  if (realIp) return realIp;
-  const parts = (headerList.get("x-forwarded-for") ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return parts.at(-1) ?? "unknown";
 }
 
 export async function login(

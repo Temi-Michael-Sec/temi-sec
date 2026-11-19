@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "check:html-sinks": "node scripts/check-html-sinks.mjs",
+    "prebuild": "npm run check:html-sinks",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
